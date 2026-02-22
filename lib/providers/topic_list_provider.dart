@@ -12,6 +12,7 @@ enum TopicListFilter {
   latest,
   newTopics,
   unread,
+  unseen,
   top,
   hot,
 }
@@ -27,6 +28,8 @@ extension TopicListFilterX on TopicListFilter {
         return 'new';
       case TopicListFilter.unread:
         return 'unread';
+      case TopicListFilter.unseen:
+        return 'unseen';
       case TopicListFilter.top:
         return 'top';
       case TopicListFilter.hot:
@@ -144,6 +147,8 @@ class TopicListNotifier extends AsyncNotifier<List<Topic>> {
         return service.getNewTopics(page: page);
       case TopicListFilter.unread:
         return service.getUnreadTopics(page: page);
+      case TopicListFilter.unseen:
+        return service.getUnseenTopics(page: page);
       case TopicListFilter.top:
         return service.getTopTopics();
       case TopicListFilter.hot:

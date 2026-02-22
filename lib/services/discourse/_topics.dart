@@ -76,6 +76,14 @@ mixin _TopicsMixin on _DiscourseServiceBase {
     return TopicListResponse.fromJson(response.data);
   }
 
+  Future<TopicListResponse> getUnseenTopics({int page = 0}) async {
+    final response = await _dio.get(
+      '/unseen.json',
+      queryParameters: page > 0 ? {'page': page} : null,
+    );
+    return TopicListResponse.fromJson(response.data);
+  }
+
   Future<TopicListResponse> getHotTopics({int page = 0}) async {
     final response = await _dio.get(
       '/hot.json',
