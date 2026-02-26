@@ -63,9 +63,25 @@ class _CodeBlockWidgetState extends State<_CodeBlockWidget> {
   }
 
   String get _code {
-    final text = widget.codeElement.text as String;
+    var text = widget.codeElement.text as String;
+    // 当 .text 为空时（如未转义的 SVG/HTML 标签被解析为实际元素，文本内容丢失），
+    // 回退到 innerHtml 并解码 HTML 实体
+    if (text.trim().isEmpty) {
+      text = _decodeHtmlEntities(widget.codeElement.innerHtml as String);
+    }
     // 去掉末尾换行符，避免多出空行
     return text.endsWith('\n') ? text.substring(0, text.length - 1) : text;
+  }
+
+  /// 解码常见 HTML 实体
+  static String _decodeHtmlEntities(String html) {
+    return html
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'")
+        .replaceAll('&apos;', "'")
+        .replaceAll('&amp;', '&'); // &amp; 必须最后解码
   }
 
   Future<void> _loadHighlight() async {
