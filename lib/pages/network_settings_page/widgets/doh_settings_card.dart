@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../services/network/doh/doh_resolver.dart';
 import '../../../services/network/doh/network_settings_service.dart';
@@ -162,12 +163,31 @@ class _DohSettingsCardState extends State<DohSettingsCard> {
                     if (proxyService.lastError != null)
                       Padding(
                         padding: const EdgeInsets.only(left: 24, top: 4),
-                        child: Text(
-                          proxyService.lastError!,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                            fontSize: 11,
-                          ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                proxyService.lastError!,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            GestureDetector(
+                              onTap: () {
+                                Clipboard.setData(ClipboardData(text: proxyService.lastError!));
+                                ToastService.showInfo('已复制错误信息');
+                              },
+                              child: Icon(
+                                Icons.copy,
+                                size: 14,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                   ],

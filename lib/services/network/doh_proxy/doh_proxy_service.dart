@@ -89,7 +89,8 @@ class DohProxyService {
           dohServer: dohServer,
         );
         if (resultPort <= 0) {
-          _lastError = 'FFI 启动失败，返回值: $resultPort';
+          // _callFfiStart 已设置更详细的 _lastError，仅在未设置时补充
+          _lastError ??= 'FFI 启动失败，返回值: $resultPort';
           NetworkLogger.log('[DOH] $_lastError');
           return false;
         }
@@ -400,7 +401,8 @@ void _ffiIsolateEntry(SendPort mainSendPort) {
 
     try {
       if (!DohProxyFfi.instance.initialize()) {
-        replyTo.send({'ok': false, 'error': 'ffi init failed'});
+        final detail = DohProxyFfi.instance.lastInitError ?? '未知原因';
+        replyTo.send({'ok': false, 'error': '无法加载原生库: $detail'});
         return;
       }
 
@@ -423,14 +425,24 @@ void _ffiIsolateEntry(SendPort mainSendPort) {
             );
           }
           if (resultPort <= 0) {
-            if (DohProxyFfi.instance.isRunning()) {
-              final runningPort = DohProxyFfi.instance.getPort();
-              if (runningPort > 0) {
-                replyTo.send({'ok': true, 'port': runningPort});
-                return;
+            // Rust 内部只等 200ms 就检查端口，老设备可能不够
+            // 在 Dart 侧延迟重试，最多再等 1 秒
+            for (var i = 0; i < 5; i++) {
+              sleep(const Duration(milliseconds: 200));
+              if (DohProxyFfi.instance.isRunning()) {
+                final runningPort = DohProxyFfi.instance.getPort();
+                if (runningPort > 0) {
+                  replyTo.send({'ok': true, 'port': runningPort});
+                  return;
+                }
               }
             }
-            replyTo.send({'ok': false, 'error': 'start returned $resultPort'});
+            // 重试后仍失败，构建诊断信息
+            final details = StringBuffer('Rust 代理启动返回 $resultPort');
+            details.write('，端口=$portValue');
+            if (dohServer != null) details.write('，DoH=$dohServer');
+            details.write('，延迟重试后仍未就绪');
+            replyTo.send({'ok': false, 'error': details.toString()});
           } else {
             replyTo.send({'ok': true, 'port': resultPort});
           }

@@ -63,7 +63,8 @@ class DohProxyFfi {
       _initialized = true;
       return true;
     } catch (e) {
-      debugPrint('[DOH FFI] Failed to initialize: $e');
+      lastInitError = '初始化 FFI 绑定失败: $e';
+      debugPrint('[DOH FFI] $lastInitError');
       return false;
     }
   }
@@ -83,10 +84,14 @@ class DohProxyFfi {
         return DynamicLibrary.open('libdoh_proxy.so');
       }
     } catch (e) {
-      debugPrint('[DOH FFI] Failed to load library: $e');
+      lastInitError = '加载原生库失败: $e';
+      debugPrint('[DOH FFI] $lastInitError');
     }
     return null;
   }
+
+  /// 最近一次初始化失败的原因
+  String? lastInitError;
 
   /// Start the DOH proxy server
   /// Returns the port number on success, or -1 on failure
