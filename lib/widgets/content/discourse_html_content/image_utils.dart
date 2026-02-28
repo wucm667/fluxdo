@@ -16,12 +16,17 @@ class GalleryInfo {
   /// 缩略图 URL 到索引的映射（用于快速查找）
   final Map<String, int> _thumbnailToIndex;
 
+  /// spoiler 内的图片 URL 集合（揭示前不在画廊中显示）
+  final Set<String> _spoilerImageUrls;
+
   GalleryInfo._({
     required this.originalUrls,
     required Map<String, int> thumbnailToIndex,
     List<String?>? filenames,
+    Set<String>? spoilerImageUrls,
   })  : _thumbnailToIndex = thumbnailToIndex,
-        filenames = filenames ?? List.filled(originalUrls.length, null);
+        filenames = filenames ?? List.filled(originalUrls.length, null),
+        _spoilerImageUrls = spoilerImageUrls ?? {};
 
   /// 获取指定索引的文件名
   String? getFilename(int index) {
@@ -29,12 +34,27 @@ class GalleryInfo {
     return null;
   }
 
+  /// 获取可见图片的索引列表（排除未揭示 spoiler 中的图片）
+  /// [revealedImageUrls] 为已揭示的 spoiler 图片 URL 集合
+  List<int> getVisibleIndices(Set<String> revealedImageUrls) {
+    if (_spoilerImageUrls.isEmpty) {
+      return List.generate(originalUrls.length, (i) => i);
+    }
+    return [
+      for (int i = 0; i < originalUrls.length; i++)
+        if (!_spoilerImageUrls.contains(originalUrls[i]) ||
+            revealedImageUrls.contains(originalUrls[i]))
+          i,
+    ];
+  }
+
   /// 从 HTML 提取画廊信息
-  /// 与 Discourse 官方一致：只收集 a.lightbox 内的图片（排除 spoiler 内的）
+  /// 收集所有 a.lightbox 内的图片（标记 spoiler 内的，揭示后才加入可见画廊）
   static GalleryInfo fromHtml(String html) {
     final List<String> originalUrls = [];
     final List<String?> filenames = [];
     final Map<String, int> thumbnailToIndex = {};
+    final Set<String> spoilerImageUrls = {};
 
     final doc = html_parser.parseFragment(html);
 
@@ -42,7 +62,7 @@ class GalleryInfo {
     final lightboxLinks = doc.querySelectorAll('a.lightbox');
 
     for (final anchor in lightboxLinks) {
-      // 排除 spoiler 内的 lightbox（与 Discourse 前端行为一致）
+      // 检查是否在 spoiler 内
       bool inSpoiler = false;
       var parent = anchor.parent;
       while (parent != null) {
@@ -53,7 +73,6 @@ class GalleryInfo {
         }
         parent = parent.parent;
       }
-      if (inSpoiler) continue;
 
       // 原图 URL：从 a.lightbox 的 href 获取
       final href = anchor.attributes['href'];
@@ -80,6 +99,11 @@ class GalleryInfo {
       originalUrls.add(originalUrl);
       filenames.add(filename);
 
+      // 标记 spoiler 内的图片
+      if (inSpoiler) {
+        spoilerImageUrls.add(originalUrl);
+      }
+
       // 用缩略图和原图 URL 都作为索引 key
       if (thumbnailUrl != null) {
         thumbnailToIndex[thumbnailUrl] = index;
@@ -97,11 +121,13 @@ class GalleryInfo {
       originalUrls: originalUrls,
       thumbnailToIndex: thumbnailToIndex,
       filenames: filenames,
+      spoilerImageUrls: spoilerImageUrls,
     );
   }
 
   /// 从外部传入的图片列表构建 GalleryInfo
-  static GalleryInfo fromImages(List<String> images) {
+  /// [spoilerImageUrls] 可选，标记哪些图片在 spoiler 内
+  static GalleryInfo fromImages(List<String> images, {Set<String>? spoilerImageUrls}) {
     final Map<String, int> thumbnailToIndex = {};
 
     for (var i = 0; i < images.length; i++) {
@@ -117,6 +143,7 @@ class GalleryInfo {
     return GalleryInfo._(
       originalUrls: images,
       thumbnailToIndex: thumbnailToIndex,
+      spoilerImageUrls: spoilerImageUrls,
     );
   }
 
@@ -148,6 +175,9 @@ class GalleryInfo {
     
     return null;
   }
+
+  /// spoiler 内的图片 URL 集合（公开供传递）
+  Set<String> get spoilerImageUrls => _spoilerImageUrls;
 
   /// 获取原图 URL 列表（用于传递给画廊查看器）
   List<String> get images => originalUrls;
@@ -303,6 +333,35 @@ class DiscourseImageUtils {
       return '${AppConstants.baseUrl}$url';
     }
     return url;
+  }
+
+  /// 打开图片查看器（过滤不可见的 spoiler 图片）
+  /// 根据 [revealedImageUrls] 过滤画廊，只显示非 spoiler 图片和已揭示的 spoiler 图片
+  static void openViewerFiltered({
+    required BuildContext context,
+    required GalleryInfo galleryInfo,
+    required Set<String> revealedImageUrls,
+    required String imageUrl,
+    required String heroTag,
+    required int fullGalleryIndex,
+    String? thumbnailUrl,
+  }) {
+    final allImages = galleryInfo.images;
+    final allHeroTags = galleryInfo.heroTags;
+    final visibleIndices = galleryInfo.getVisibleIndices(revealedImageUrls);
+    final visibleIndex = visibleIndices.indexOf(fullGalleryIndex);
+
+    openViewer(
+      context: context,
+      imageUrl: getOriginalUrl(imageUrl),
+      heroTag: heroTag,
+      galleryImages: visibleIndices.map((i) => getOriginalUrl(allImages[i])).toList(),
+      heroTags: visibleIndices.map((i) => allHeroTags[i]).toList(),
+      initialIndex: visibleIndex >= 0 ? visibleIndex : 0,
+      thumbnailUrl: thumbnailUrl ?? imageUrl,
+      thumbnailUrls: visibleIndices.map((i) => allImages[i]).toList(),
+      filenames: visibleIndices.map((i) => galleryInfo.filenames[i]).toList(),
+    );
   }
 
   /// 打开图片查看器

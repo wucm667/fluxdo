@@ -40,6 +40,10 @@ class DiscourseHtmlContent extends ConsumerStatefulWidget {
   final List<LinkCount>? linkCounts;
   /// 外部传入的画廊图片列表（用于分块渲染时共享完整画廊）
   final List<String>? galleryImages;
+  /// 外部传入的 spoiler 图片 URL 集合（与 galleryImages 配合使用）
+  final Set<String>? spoilerImageUrls;
+  /// 外部共享的已揭示图片 URL 集合（跨分块/嵌套共享状态）
+  final Set<String>? revealedImageUrls;
   /// 是否启用选择区域（分块渲染时由外层统一控制）
   final bool enableSelectionArea;
   /// 被提及用户列表（含状态 emoji）
@@ -69,6 +73,8 @@ class DiscourseHtmlContent extends ConsumerStatefulWidget {
     this.onInternalLinkTap,
     this.linkCounts,
     this.galleryImages,
+    this.spoilerImageUrls,
+    this.revealedImageUrls,
     this.enableSelectionArea = true,
     this.mentionedUsers,
     this.fullHtml,
@@ -93,6 +99,10 @@ class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
   /// 已揭示的内联 spoiler ID 集合
   final Set<String> _revealedSpoilers = {};
 
+  /// 已揭示的 spoiler 内的图片 URL 集合（用于画廊过滤）
+  /// 优先使用外部共享集合，否则创建本地集合
+  late final Set<String> _revealedImageUrls;
+
   /// 预处理后的 HTML 缓存，避免每次 build 都重新执行正则替换
   String? _cachedProcessedHtml;
   /// 缓存对应的原始输入快照，用于判断是否需要重新计算
@@ -104,17 +114,23 @@ class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
   @override
   void initState() {
     super.initState();
+    // 使用外部共享的已揭示集合，或创建本地集合
+    _revealedImageUrls = widget.revealedImageUrls ?? {};
     // 优先使用外部传入的画廊图片列表，否则从 HTML 提取
     if (widget.galleryImages != null && widget.galleryImages!.isNotEmpty) {
-      // 从外部传入的画廊列表构建 GalleryInfo
-      _galleryInfo = GalleryInfo.fromImages(widget.galleryImages!);
+      // 从外部传入的画廊列表构建 GalleryInfo（附带 spoiler 标记）
+      _galleryInfo = GalleryInfo.fromImages(
+        widget.galleryImages!,
+        spoilerImageUrls: widget.spoilerImageUrls,
+      );
     } else {
-      // 从 HTML 提取画廊信息（包含缩略图到索引的映射）
+      // 从 HTML 提取画廊信息（包含缩略图到索引的映射和 spoiler 标记）
       _galleryInfo = GalleryInfo.fromHtml(widget.html);
     }
     _widgetFactory = DiscourseWidgetFactory(
       context: context,
       galleryInfo: _galleryInfo,
+      revealedImageUrls: _revealedImageUrls,
     );
   }
 
@@ -357,21 +373,15 @@ class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
         // 但 inline span 的 recognizer 传递不经过 buildGestureDetector，需要这里兜底
         final galleryIndex = _galleryInfo.findIndex(url);
         if (galleryIndex != null) {
-          final galleryImages = _galleryInfo.images;
-          final originalGalleryImages = galleryImages
-              .map((e) => DiscourseImageUtils.getOriginalUrl(e))
-              .toList();
-          final heroTags = DiscourseImageUtils.generateGalleryHeroTags(galleryImages);
+          final allHeroTags = _galleryInfo.heroTags;
 
-          DiscourseImageUtils.openViewer(
+          DiscourseImageUtils.openViewerFiltered(
             context: context,
-            imageUrl: DiscourseImageUtils.getOriginalUrl(url),
-            heroTag: heroTags[galleryIndex],
-            galleryImages: originalGalleryImages,
-            heroTags: heroTags,
-            initialIndex: galleryIndex,
-            thumbnailUrls: galleryImages,
-            filenames: _galleryInfo.filenames,
+            galleryInfo: _galleryInfo,
+            revealedImageUrls: _revealedImageUrls,
+            imageUrl: url,
+            heroTag: allHeroTags[galleryIndex],
+            fullGalleryIndex: galleryIndex,
           );
           return true;
         }
@@ -474,6 +484,8 @@ class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
           compact: true,
           textStyle: textStyle,
           galleryImages: _galleryInfo.images,
+          spoilerImageUrls: _galleryInfo.spoilerImageUrls,
+          revealedImageUrls: _revealedImageUrls,
           onInternalLinkTap: widget.onInternalLinkTap,
           post: widget.post,
           topicId: widget.topicId,
@@ -595,6 +607,8 @@ class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
         onReveal: () {
           setState(() {
             _revealedSpoilers.add(spoilerId);
+            // 提取 spoiler 内的 lightbox 图片 URL，加入已揭示集合
+            _extractSpoilerImageUrls(element);
           });
         },
       );
@@ -678,6 +692,21 @@ class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
     // 使用 CSS 样式渲染，回归文档流
 
     return null;
+  }
+
+  /// 提取 spoiler 元素内的 lightbox 图片 URL，添加到已揭示集合
+  void _extractSpoilerImageUrls(dynamic element) {
+    final lightboxLinks = element.querySelectorAll('a.lightbox');
+    for (final anchor in lightboxLinks) {
+      final href = anchor.attributes['href'] as String?;
+      if (href != null && href.isNotEmpty) {
+        var url = href;
+        if (url.startsWith('/') && !url.startsWith('//')) {
+          url = '${AppConstants.baseUrl}$url';
+        }
+        _revealedImageUrls.add(url);
+      }
+    }
   }
 
   /// 格式化点击数

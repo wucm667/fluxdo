@@ -93,6 +93,9 @@ class _ChunkedHtmlContentState extends State<ChunkedHtmlContent> {
   List<HtmlChunk>? _chunks;
   late bool _useChunking;
   late List<String> _galleryImages;
+  late Set<String> _spoilerImageUrls;
+  /// 所有分块共享的已揭示图片 URL 集合
+  final Set<String> _revealedImageUrls = {};
 
   @override
   void initState() {
@@ -110,7 +113,9 @@ class _ChunkedHtmlContentState extends State<ChunkedHtmlContent> {
   }
 
   void _initChunks() {
-    _galleryImages = ChunkedHtmlContent.extractGalleryImages(widget.html);
+    final galleryInfo = GalleryInfo.fromHtml(widget.html);
+    _galleryImages = galleryInfo.images;
+    _spoilerImageUrls = galleryInfo.spoilerImageUrls;
 
     _useChunking = widget.enableChunking ??
         (widget.html.length > ChunkedHtmlContent.chunkThreshold);
@@ -160,6 +165,8 @@ class _ChunkedHtmlContentState extends State<ChunkedHtmlContent> {
         onInternalLinkTap: widget.onInternalLinkTap,
         linkCounts: widget.linkCounts,
         galleryImages: _galleryImages,
+        spoilerImageUrls: _spoilerImageUrls,
+        revealedImageUrls: _revealedImageUrls,
         mentionedUsers: widget.mentionedUsers,
         fullHtml: widget.html,
         post: widget.post,
@@ -190,6 +197,8 @@ class HtmlChunkWidget extends StatelessWidget {
   final void Function(int topicId, String? topicSlug, int? postNumber)? onInternalLinkTap;
   final List<LinkCount>? linkCounts;
   final List<String> galleryImages;
+  final Set<String>? spoilerImageUrls;
+  final Set<String>? revealedImageUrls;
   final List<MentionedUser>? mentionedUsers;
   final String fullHtml;
   final Post? post;
@@ -214,6 +223,8 @@ class HtmlChunkWidget extends StatelessWidget {
     this.onInternalLinkTap,
     this.linkCounts,
     required this.galleryImages,
+    this.spoilerImageUrls,
+    this.revealedImageUrls,
     this.mentionedUsers,
     required this.fullHtml,
     this.post,
@@ -232,6 +243,8 @@ class HtmlChunkWidget extends StatelessWidget {
         onInternalLinkTap: onInternalLinkTap,
         linkCounts: linkCounts,
         galleryImages: galleryImages,
+        spoilerImageUrls: spoilerImageUrls,
+        revealedImageUrls: revealedImageUrls,
         enableSelectionArea: enableSelectionArea,
         mentionedUsers: mentionedUsers,
         fullHtml: fullHtml,

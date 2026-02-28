@@ -12,7 +12,10 @@ import 'selectable_adapter.dart';
 /// 自定义 WidgetFactory，仅用于接管图片渲染
 class DiscourseWidgetFactory extends WidgetFactory {
   final BuildContext context;
-  final GalleryInfo? galleryInfo;
+  GalleryInfo? galleryInfo;
+
+  /// 已揭示的 spoiler 图片 URL 集合（引用 State 的 Set，实时反映揭示状态）
+  final Set<String> revealedImageUrls;
 
   /// 获取画廊图片列表（原图 URL）
   List<String> get galleryImages => galleryInfo?.images ?? [];
@@ -25,7 +28,8 @@ class DiscourseWidgetFactory extends WidgetFactory {
   DiscourseWidgetFactory({
     required this.context,
     this.galleryInfo,
-  });
+    Set<String>? revealedImageUrls,
+  }) : revealedImageUrls = revealedImageUrls ?? {};
 
   @override
   Widget? buildListMarker(
@@ -237,22 +241,14 @@ class DiscourseWidgetFactory extends WidgetFactory {
             heroTag: heroTag,
             cacheKey: resolvedUrl, // 使用稳定的 URL 作为缓存 key
             onTap: () {
-              final originalUrl = DiscourseImageUtils.getOriginalUrl(resolvedUrl!);
-              final originalGalleryImages = galleryImages
-                  .map((e) => DiscourseImageUtils.getOriginalUrl(e))
-                  .toList();
-              final heroTags = DiscourseImageUtils.generateGalleryHeroTags(galleryImages);
-
-              DiscourseImageUtils.openViewer(
+              DiscourseImageUtils.openViewerFiltered(
                 context: context,
-                imageUrl: originalUrl,
+                galleryInfo: galleryInfo!,
+                revealedImageUrls: revealedImageUrls,
+                imageUrl: resolvedUrl!,
                 heroTag: heroTag,
-                galleryImages: originalGalleryImages,
-                heroTags: heroTags,
-                initialIndex: galleryIndex,
+                fullGalleryIndex: galleryIndex,
                 thumbnailUrl: resolvedUrl,
-                thumbnailUrls: galleryImages,
-                filenames: galleryInfo?.filenames,
               );
             },
           );
