@@ -125,8 +125,32 @@ class _CombinedDecoratorOverlayState extends State<CombinedDecoratorOverlay>
 
     final newCodeGroups = <List<Rect>>[];
     final spoilerTempRects = <_TempRect>[];
+    int paragraphIndex = 0;
 
-    _visitRenderObject(renderObject, Offset.zero, newCodeGroups, spoilerTempRects);
+    void visitRenderObject(
+      RenderObject ro,
+      Offset parentOffset,
+    ) {
+      if (ro is RenderScanBoundary) return;
+
+      if (ro is RenderParagraph) {
+        _extractFromParagraph(ro, parentOffset, paragraphIndex, newCodeGroups, spoilerTempRects);
+        paragraphIndex++;
+      }
+
+      ro.visitChildren((child) {
+        Offset childOffset = parentOffset;
+        if (child is RenderBox && ro is RenderBox) {
+          final parentData = child.parentData;
+          if (parentData is BoxParentData) {
+            childOffset = parentOffset + parentData.offset;
+          }
+        }
+        visitRenderObject(child, childOffset);
+      });
+    }
+
+    visitRenderObject(renderObject, Offset.zero);
 
     // 处理 code groups
     _codeGroups = newCodeGroups;
@@ -143,36 +167,10 @@ class _CombinedDecoratorOverlayState extends State<CombinedDecoratorOverlay>
     _spoilerGroups = newSpoilerGroups;
   }
 
-  void _visitRenderObject(
-    RenderObject renderObject,
-    Offset parentOffset,
-    List<List<Rect>> codeGroups,
-    List<_TempRect> spoilerRects,
-  ) {
-    // 遇到扫描边界时停止
-    if (renderObject is RenderScanBoundary) {
-      return;
-    }
-
-    if (renderObject is RenderParagraph) {
-      _extractFromParagraph(renderObject, parentOffset, codeGroups, spoilerRects);
-    }
-
-    renderObject.visitChildren((child) {
-      Offset childOffset = parentOffset;
-      if (child is RenderBox && renderObject is RenderBox) {
-        final parentData = child.parentData;
-        if (parentData is BoxParentData) {
-          childOffset = parentOffset + parentData.offset;
-        }
-      }
-      _visitRenderObject(child, childOffset, codeGroups, spoilerRects);
-    });
-  }
-
   void _extractFromParagraph(
     RenderParagraph paragraph,
     Offset offset,
+    int paragraphIndex,
     List<List<Rect>> codeGroups,
     List<_TempRect> spoilerRects,
   ) {
@@ -185,6 +183,7 @@ class _CombinedDecoratorOverlayState extends State<CombinedDecoratorOverlay>
       null,
       false,
       null,
+      paragraphIndex,
       codeGroups,
       spoilerRects,
     );
@@ -199,6 +198,7 @@ class _CombinedDecoratorOverlayState extends State<CombinedDecoratorOverlay>
     TextStyle? parentStyle,
     bool parentIsSpoiler,
     String? currentSpoilerId,
+    int paragraphIndex,
     List<List<Rect>> codeGroups,
     List<_TempRect> spoilerRects,
   ) {
@@ -211,10 +211,10 @@ class _CombinedDecoratorOverlayState extends State<CombinedDecoratorOverlay>
       final hasSpoilerMarker = isSpoilerMarkerStyle(effectiveStyle);
       final inSpoiler = hasSpoilerMarker || parentIsSpoiler;
 
-      // 决定 spoiler ID
+      // 决定 spoiler ID（使用段落遍历索引 + charIndex，跨 rebuild 稳定）
       String? spoilerId = currentSpoilerId;
       if (inSpoiler && spoilerId == null) {
-        spoilerId = 'spoiler_${charIndex}_${paragraph.hashCode}';
+        spoilerId = 'spoiler_${paragraphIndex}_$charIndex';
       }
 
       if (textLength > 0) {
@@ -292,6 +292,7 @@ class _CombinedDecoratorOverlayState extends State<CombinedDecoratorOverlay>
             effectiveStyle,
             inSpoiler,
             childSpoilerId,
+            paragraphIndex,
             codeGroups,
             spoilerRects,
           );
@@ -349,8 +350,9 @@ class _CombinedDecoratorOverlayState extends State<CombinedDecoratorOverlay>
     final hasCodeBackground = _codeGroups.isNotEmpty;
     final hasSpoilerOverlay = activeGroups.isNotEmpty;
 
-    // 没有任何装饰层时，直接返回子组件，避免 Stack 开销
-    if (!hasCodeBackground && !hasSpoilerOverlay) {
+    // 没有任何装饰层且从未出现过 spoiler 时，直接返回子组件，避免 Stack 开销
+    // 注意：有 spoiler 组时必须保留 Stack，否则揭示后 widget tree 重构会导致 rescan → ID 变化
+    if (!hasCodeBackground && !hasSpoilerOverlay && _spoilerGroups.isEmpty) {
       return widget.child;
     }
 

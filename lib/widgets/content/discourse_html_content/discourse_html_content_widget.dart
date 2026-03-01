@@ -466,9 +466,10 @@ class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
       result = CombinedDecoratorOverlay(
         revealedSpoilers: _revealedSpoilers,
         onReveal: (id) {
-          setState(() {
-            _revealedSpoilers.add(id);
-          });
+          // 仅更新 Set，不触发父组件 rebuild
+          // CombinedDecoratorOverlay 自身的 setState 已处理视觉更新
+          // 避免父 rebuild 导致 HtmlWidget 重建 → rescan → spoiler ID 变化 → 闪回
+          _revealedSpoilers.add(id);
         },
         child: htmlWidget,
       );
