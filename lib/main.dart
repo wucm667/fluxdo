@@ -370,7 +370,20 @@ class _MainPageState extends ConsumerState<MainPage> with WidgetsBindingObserver
   Future<void> _handleAuthError(String message) async {
     if (!mounted) return;
 
-    ToastService.showError(message);
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('登录失效'),
+        content: Text(message),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
 
     if (mounted) {
       await AppStateRefresher.resetForLogout(ref);
