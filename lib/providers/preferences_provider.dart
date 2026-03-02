@@ -12,6 +12,8 @@ class AppPreferences {
   final double contentFontScale;
   /// 分享图片主题索引
   final int shareImageThemeIndex;
+  /// 自动填充登录凭证
+  final bool autoFillLogin;
 
   const AppPreferences({
     required this.autoPanguSpacing,
@@ -20,6 +22,7 @@ class AppPreferences {
     required this.openExternalLinksInAppBrowser,
     required this.contentFontScale,
     required this.shareImageThemeIndex,
+    required this.autoFillLogin,
   });
 
   AppPreferences copyWith({
@@ -29,6 +32,7 @@ class AppPreferences {
     bool? openExternalLinksInAppBrowser,
     double? contentFontScale,
     int? shareImageThemeIndex,
+    bool? autoFillLogin,
   }) {
     return AppPreferences(
       autoPanguSpacing: autoPanguSpacing ?? this.autoPanguSpacing,
@@ -38,6 +42,7 @@ class AppPreferences {
           openExternalLinksInAppBrowser ?? this.openExternalLinksInAppBrowser,
       contentFontScale: contentFontScale ?? this.contentFontScale,
       shareImageThemeIndex: shareImageThemeIndex ?? this.shareImageThemeIndex,
+      autoFillLogin: autoFillLogin ?? this.autoFillLogin,
     );
   }
 }
@@ -50,6 +55,7 @@ class PreferencesNotifier extends StateNotifier<AppPreferences> {
       'pref_open_external_links_in_app_browser';
   static const String _contentFontScaleKey = 'pref_content_font_scale';
   static const String _shareImageThemeIndexKey = 'pref_share_image_theme_index';
+  static const String _autoFillLoginKey = 'pref_auto_fill_login';
 
   PreferencesNotifier(this._prefs)
       : super(
@@ -61,6 +67,7 @@ class PreferencesNotifier extends StateNotifier<AppPreferences> {
                 _prefs.getBool(_openExternalLinksInAppBrowserKey) ?? false,
             contentFontScale: _prefs.getDouble(_contentFontScaleKey) ?? 1.0,
             shareImageThemeIndex: _prefs.getInt(_shareImageThemeIndexKey) ?? 0,
+            autoFillLogin: _prefs.getBool(_autoFillLoginKey) ?? true,
           ),
         );
 
@@ -96,6 +103,11 @@ class PreferencesNotifier extends StateNotifier<AppPreferences> {
   Future<void> setShareImageThemeIndex(int index) async {
     state = state.copyWith(shareImageThemeIndex: index);
     await _prefs.setInt(_shareImageThemeIndexKey, index);
+  }
+
+  Future<void> setAutoFillLogin(bool enabled) async {
+    state = state.copyWith(autoFillLogin: enabled);
+    await _prefs.setBool(_autoFillLoginKey, enabled);
   }
 }
 

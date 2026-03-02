@@ -76,6 +76,21 @@ class PreferencesPage extends ConsumerWidget {
                     ref.read(preferencesProvider.notifier).setAnonymousShare(value);
                   },
                 ),
+                Divider(height: 1, indent: 56, color: theme.colorScheme.outlineVariant.withValues(alpha:0.3)),
+                SwitchListTile(
+                  title: const Text('自动填充登录'),
+                  subtitle: const Text('记住账号密码，登录时自动填充'),
+                  secondary: Icon(
+                    Icons.password_rounded,
+                    color: preferences.autoFillLogin
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                  value: preferences.autoFillLogin,
+                  onChanged: (value) {
+                    ref.read(preferencesProvider.notifier).setAutoFillLogin(value);
+                  },
+                ),
               ],
             ),
           ),
