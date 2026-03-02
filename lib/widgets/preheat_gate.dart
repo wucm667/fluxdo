@@ -3,6 +3,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../services/preloaded_data_service.dart';
 import '../services/discourse/discourse_service.dart';
 import '../services/emoji_handler.dart';
+import '../pages/network_settings_page/network_settings_page.dart';
+import '../utils/error_utils.dart';
+import '../widgets/common/error_view.dart';
 
 class PreheatGate extends StatefulWidget {
   final Widget child;
@@ -15,6 +18,7 @@ class PreheatGate extends StatefulWidget {
 
 class _PreheatGateState extends State<PreheatGate> {
   late Future<bool> _loadFuture;
+  Object? _error;
 
   @override
   void initState() {
@@ -32,9 +36,11 @@ class _PreheatGateState extends State<PreheatGate> {
       EmojiHandler().init();
       DiscourseService().preloadUserSummary();
 
+      _error = null;
       return true;
     } catch (e) {
       debugPrint('[PreheatGate] Preload failed: $e');
+      _error = e;
       return false;
     }
   }
@@ -65,6 +71,7 @@ class _PreheatGateState extends State<PreheatGate> {
         } else {
           currentWidget = _PreheatFailed(
             key: const ValueKey('error'),
+            error: _error,
             onRetry: _retry,
           );
         }
@@ -196,64 +203,152 @@ class _PreheatLoadingState extends State<_PreheatLoading>
 
 class _PreheatFailed extends StatelessWidget {
   final VoidCallback onRetry;
+  final Object? error;
 
-  const _PreheatFailed({super.key, required this.onRetry});
+  const _PreheatFailed({super.key, required this.onRetry, this.error});
+
+  void _openNetworkSettings(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const NetworkSettingsPage()),
+    );
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('退出登录'),
+        content: const Text('确定要退出当前账号吗？退出后将清除本地登录信息。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('退出'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      await DiscourseService().logout(callApi: false, refreshPreload: false);
+      onRetry();
+    }
+  }
+
+  void _showErrorDetails(BuildContext context) {
+    final details = ErrorUtils.getErrorDetails(error, null);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => ErrorDetailsSheet(details: details),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final errorInfo = ErrorUtils.getErrorInfo(error);
+    final buttonStyle = IconButton.styleFrom(
+      backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    );
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: colorScheme.errorContainer.withValues(alpha: 0.3),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.signal_wifi_off_rounded,
-                  size: 48,
-                  color: colorScheme.error,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                '网络连接不可用',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '无法连接到服务器，请检查您的网络设置',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 32),
-              FilledButton.tonalIcon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh_rounded, size: 20),
-                label: const Text('重试连接'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32,
-                    vertical: 16,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // 右上角：网络设置 + 退出登录
+            Positioned(
+              top: 16,
+              right: 16,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.network_check_rounded),
+                    tooltip: '网络设置',
+                    style: buttonStyle,
+                    onPressed: () => _openNetworkSettings(context),
                   ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.logout_rounded),
+                    tooltip: '退出登录',
+                    style: buttonStyle,
+                    onPressed: () => _confirmLogout(context),
+                  ),
+                ],
+              ),
+            ),
+            // 居中内容
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: colorScheme.errorContainer.withValues(alpha: 0.3),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        errorInfo.icon,
+                        size: 48,
+                        color: colorScheme.error,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      errorInfo.title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      errorInfo.message,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    FilledButton.tonalIcon(
+                      onPressed: onRetry,
+                      icon: const Icon(Icons.refresh_rounded, size: 20),
+                      label: const Text('重试连接'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 16,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () => _showErrorDetails(context),
+                      icon: const Icon(Icons.info_outline_rounded, size: 20),
+                      label: const Text('查看详情'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 16,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

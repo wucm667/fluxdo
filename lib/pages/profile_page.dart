@@ -47,25 +47,36 @@ class ProfilePage extends ConsumerStatefulWidget {
 class _ProfilePageState extends ConsumerState<ProfilePage> {
   late ScrollController _scrollController;
   bool _showTitle = false;
+  bool _isRefreshing = false;
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController();
     _scrollController.addListener(_onScroll);
-    
+
     // 进入页面后静默刷新用户数据（不触发 loading 状态）
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         final current = ref.read(currentUserProvider).value;
         if (current != null) {
-          // 使用 refresh 在后台更新数据，不会触发 loading 状态，避免 UI 闪烁
-          // 忽略返回值，因为我们只是触发后台刷新
-          ref.read(currentUserProvider.notifier).refreshSilently().ignore();
-          ref.read(userSummaryProvider.notifier).refresh();
+          _refreshData();
         }
       }
     });
+  }
+
+  Future<void> _refreshData() async {
+    if (!mounted) return;
+    setState(() => _isRefreshing = true);
+    try {
+      await Future.wait([
+        ref.read(currentUserProvider.notifier).refreshSilently(),
+        ref.read(userSummaryProvider.notifier).refresh(),
+      ]);
+    } finally {
+      if (mounted) setState(() => _isRefreshing = false);
+    }
   }
 
   @override
@@ -218,9 +229,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final hasError = userState.hasError && !userState.hasValue;
     final errorMessage = userState.error?.toString() ?? '';
 
+    final isOffline = userState.hasError && userState.hasValue && userState.value != null;
+
     return Scaffold(
       appBar: AppBar(
-        title: _showTitle && displayName.isNotEmpty 
+        title: _showTitle && displayName.isNotEmpty
             ? GestureDetector(
                 onTap: () {
                   _scrollController.animateTo(
@@ -245,6 +258,23 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             : null,
         centerTitle: false,
         actions: isLoggedIn ? [
+          // 刷新中 / 离线状态指示
+          if (_isRefreshing)
+            const IconButton(
+              icon: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              tooltip: '正在刷新...',
+              onPressed: null,
+            )
+          else if (isOffline)
+            IconButton(
+              icon: Icon(Icons.cloud_off_rounded, color: theme.colorScheme.outline),
+              tooltip: '数据可能不是最新的，下拉刷新重试',
+              onPressed: null,
+            ),
           IconButton(
             icon: const Icon(Icons.manage_accounts_rounded),
             tooltip: '编辑资料',
@@ -257,50 +287,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         ] : null,
       ),
       body: RefreshIndicator(
-        onRefresh: () async {
-          final current = ref.read(currentUserProvider).value;
-          if (current == null) return;
-          await ref.read(currentUserProvider.notifier).refreshSilently();
-          ref.invalidate(userSummaryProvider);
-          final service = ref.read(discourseServiceProvider);
-          final user = ref.read(currentUserProvider).value;
-          if (user != null) {
-            await service.getUserSummary(user.username, forceRefresh: true);
-          }
-        },
+        onRefresh: _refreshData,
         child: ListView(
           controller: _scrollController,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           children: [
             const _ProfileHeader(),
             const SizedBox(height: 24),
-            
-            // 有缓存但刷新失败时显示离线提示
-            if (userState.hasError && userState.hasValue && userState.value != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.cloud_off_rounded, size: 16, color: theme.colorScheme.onTertiaryContainer.withValues(alpha: 0.7)),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '数据可能不是最新的，下拉刷新重试',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onTertiaryContainer.withValues(alpha: 0.8),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
 
             if (isLoadingInitial)
               const Center(child: Padding(

@@ -60,8 +60,10 @@ class CurrentUserNotifier extends AsyncNotifier<User?> {
         _saveCache(prefs, user);
         return user;
       }
-      // 网络返回 null（未登录），返回 null
-      return cachedUser;
+      // 网络确认未登录，清除缓存并返回 null
+      await prefs.remove(_cacheKey);
+      await prefs.remove(_cacheUserKey);
+      return null;
     } catch (e) {
       // 网络失败，返回缓存
       if (cachedUser != null) return cachedUser;
@@ -101,12 +103,16 @@ class CurrentUserNotifier extends AsyncNotifier<User?> {
 
   void _refreshUser(DiscourseService service, User preloadedUser) {
     Future(() async {
-      final user = await service.getCurrentUser();
-      if (user == null) return;
-      final merged = _mergeUser(user, preloadedUser);
-      final prefs = await SharedPreferences.getInstance();
-      _saveCache(prefs, merged);
-      state = AsyncValue.data(merged);
+      try {
+        final user = await service.getCurrentUser();
+        if (user == null) return;
+        final merged = _mergeUser(user, preloadedUser);
+        final prefs = await SharedPreferences.getInstance();
+        _saveCache(prefs, merged);
+        state = AsyncValue.data(merged);
+      } catch (_) {
+        // 后台刷新失败时静默忽略，refreshSilently 会负责设置错误状态
+      }
     });
   }
 

@@ -338,7 +338,7 @@ class PreloadedDataService {
       while (_loading) {
         await Future.delayed(const Duration(milliseconds: 50));
       }
-      return;
+      if (_loaded) return; // 上次成功了才跳过
     }
     await _loadPreloadedData();
   }
@@ -364,10 +364,11 @@ class PreloadedDataService {
       final html = response.data as String;
       await _parsePreloadedDataFromHtml(html);
       debugPrint('[PreloadedData] 数据加载成功');
+      _loaded = true;
     } catch (e) {
       debugPrint('[PreloadedData] 加载失败: $e');
+      rethrow;
     } finally {
-      _loaded = true;
       _loading = false;
     }
   }

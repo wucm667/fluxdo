@@ -42,7 +42,7 @@ class ErrorView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final friendlyMessage = ErrorUtils.getFriendlyMessage(error);
+    final errorInfo = ErrorUtils.getErrorInfo(error);
 
     return Center(
       child: Padding(
@@ -52,20 +52,20 @@ class ErrorView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              icon ?? Icons.error_outline,
+              icon ?? errorInfo.icon,
               size: iconSize,
               color: theme.colorScheme.error,
             ),
             const SizedBox(height: 16),
             Text(
-              title ?? '加载失败',
+              title ?? errorInfo.title,
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              friendlyMessage,
+              errorInfo.message,
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
