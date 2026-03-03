@@ -9,6 +9,8 @@ import 'adaptive_navigation.dart';
 /// 根据屏幕宽度自动切换布局：
 /// - 手机: 底部导航
 /// - 平板/桌面: 侧边导航栏
+///
+/// 使用单一 Scaffold + Row 结构，确保布局切换时 body 不会被卸载重建。
 class AdaptiveScaffold extends ConsumerWidget {
   const AdaptiveScaffold({
     super.key,
@@ -33,46 +35,39 @@ class AdaptiveScaffold extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final showRail = Responsive.showNavigationRail(context);
 
-    if (showRail) {
-      return _buildRailLayout(context);
-    }
-    return _buildBottomNavLayout(context, ref);
-  }
-
-  Widget _buildRailLayout(BuildContext context) {
-    return Scaffold(
-      body: Row(
-        children: [
-          AdaptiveNavigationRail(
-            selectedIndex: selectedIndex,
-            onDestinationSelected: onDestinationSelected,
-            destinations: destinations,
-            extended: extendedRail,
-            leading: railLeading,
-          ),
-          const VerticalDivider(thickness: 1, width: 1),
-          Expanded(child: body),
-        ],
-      ),
-      floatingActionButton: floatingActionButton,
-    );
-  }
-
-  Widget _buildBottomNavLayout(BuildContext context, WidgetRef ref) {
-    // 仅在首页 tab 时响应滚动隐藏，其他 tab 始终显示
+    // 始终 watch barVisibilityProvider，避免条件 watch 导致 Riverpod 行为不一致
     final visibility = selectedIndex == 0
         ? ref.watch(barVisibilityProvider)
         : 1.0;
 
     return Scaffold(
-      body: body,
-      floatingActionButton: floatingActionButton,
-      bottomNavigationBar: _AnimatedBottomNav(
-        visibility: visibility,
-        selectedIndex: selectedIndex,
-        onDestinationSelected: onDestinationSelected,
-        destinations: destinations,
+      body: Row(
+        children: [
+          if (showRail) ...[
+            AdaptiveNavigationRail(
+              selectedIndex: selectedIndex,
+              onDestinationSelected: onDestinationSelected,
+              destinations: destinations,
+              extended: extendedRail,
+              leading: railLeading,
+            ),
+            const VerticalDivider(thickness: 1, width: 1),
+          ],
+          Expanded(
+            key: const ValueKey('adaptive-body'),
+            child: body,
+          ),
+        ],
       ),
+      floatingActionButton: floatingActionButton,
+      bottomNavigationBar: showRail
+          ? null
+          : _AnimatedBottomNav(
+              visibility: visibility,
+              selectedIndex: selectedIndex,
+              onDestinationSelected: onDestinationSelected,
+              destinations: destinations,
+            ),
     );
   }
 }

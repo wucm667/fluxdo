@@ -4,6 +4,8 @@ import '../../utils/layout_lock.dart';
 
 /// Master-Detail 双栏布局
 /// 平板/桌面上显示双栏，手机上只显示 master 或 detail
+///
+/// 使用统一 Row > SizedBox 结构，确保布局切换时 master 不会被卸载重建。
 class MasterDetailLayout extends StatelessWidget {
   static const double defaultMasterWidth = 380;
   static const double defaultMinDetailWidth = 400;
@@ -62,48 +64,41 @@ class MasterDetailLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final showBothPanes = canShowBothPanes(context);
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-    if (!showBothPanes) {
-      // 单栏模式：只显示 master，但仍需要显示 FAB
-      if (masterFloatingActionButton != null) {
-        return Stack(
+    // 使用 LayoutBuilder 获取实际可用宽度（已扣除 Rail 宽度）
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final totalWidth = constraints.maxWidth;
+        final showBothPanes = canShowBothPanes(context);
+        final mWidth = showBothPanes ? masterWidth : totalWidth;
+
+        return Row(
           children: [
-            master,
-            Positioned(
-              right: 16,
-              bottom: 16 + bottomPadding,
-              child: masterFloatingActionButton!,
+            SizedBox(
+              key: const ValueKey('master-pane'),
+              width: mWidth,
+              child: Stack(
+                children: [
+                  master,
+                  if (masterFloatingActionButton != null)
+                    Positioned(
+                      right: 16,
+                      bottom: 16 + bottomPadding,
+                      child: masterFloatingActionButton!,
+                    ),
+                ],
+              ),
             ),
+            if (showBothPanes) ...[
+              if (showDivider) const VerticalDivider(width: 1, thickness: 1),
+              Expanded(
+                child: detail ?? emptyDetail ?? _buildEmptyState(context),
+              ),
+            ],
           ],
         );
-      }
-      return master;
-    }
-
-    // 平板/桌面：双栏布局
-    return Row(
-      children: [
-        SizedBox(
-          width: masterWidth,
-          child: Stack(
-            children: [
-              master,
-              if (masterFloatingActionButton != null)
-                Positioned(
-                  right: 16,
-                  bottom: 16 + bottomPadding,
-                  child: masterFloatingActionButton!,
-                ),
-            ],
-          ),
-        ),
-        if (showDivider) const VerticalDivider(width: 1, thickness: 1),
-        Expanded(
-          child: detail ?? emptyDetail ?? _buildEmptyState(context),
-        ),
-      ],
+      },
     );
   }
 

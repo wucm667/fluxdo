@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/topic.dart';
@@ -98,6 +100,23 @@ class TopicDetailNotifier extends AsyncNotifier<TopicDetail> {
   @override
   Future<TopicDetail> build() async {
     debugPrint('[TopicDetailNotifier] build called with topicId=${arg.topicId}, postNumber=${arg.postNumber}');
+
+    // 保持存活，防止布局切换的短暂间隙被 autoDispose 清理
+    // 使用 onCancel/onResume 模式：最后一个 watcher 移除后才开始倒计时
+    final link = ref.keepAlive();
+    Timer? disposeTimer;
+    ref.onCancel(() {
+      // 最后一个 watcher 移除后，延迟 30 秒再允许 dispose
+      disposeTimer = Timer(const Duration(seconds: 30), link.close);
+    });
+    ref.onResume(() {
+      // 新的 watcher 出现，取消清理定时器
+      disposeTimer?.cancel();
+    });
+    ref.onDispose(() {
+      disposeTimer?.cancel();
+    });
+
     _hasMoreAfter = true;
     _hasMoreBefore = true;
     final service = ref.read(discourseServiceProvider);

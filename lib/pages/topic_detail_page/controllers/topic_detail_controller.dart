@@ -398,6 +398,13 @@ class TopicDetailController extends ChangeNotifier {
     });
   }
 
+  /// 更新当前浏览位置（由可见帖子变化驱动）
+  void updateCurrentPostNumber(int postNumber) {
+    if (_scrollState.currentPostNumber != postNumber) {
+      _scrollState = _scrollState.copyWith(currentPostNumber: postNumber);
+    }
+  }
+
   /// 更新 stream 索引
   void updateStreamIndex(int newIndex) {
     if (newIndex != _currentVisibleStreamIndex) {

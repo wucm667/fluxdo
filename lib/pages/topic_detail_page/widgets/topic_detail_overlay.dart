@@ -104,6 +104,7 @@ class TopicDetailOverlay extends StatelessWidget {
                 ? bottomPadding + (80 - bottomPadding - 56) / 2
                 : 16 + bottomPadding,
             child: FloatingActionButton(
+              heroTag: 'replyTopic',
               onPressed: onReply,
               child: const Icon(Icons.reply),
             ),

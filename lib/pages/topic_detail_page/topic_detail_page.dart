@@ -58,6 +58,7 @@ class TopicDetailPage extends ConsumerStatefulWidget {
   final bool autoSwitchToMasterDetail; // 仅在从首页进入时允许自动切换
   final bool autoOpenReply; // 自动打开回复框（从草稿进入时使用）
   final int? autoReplyToPostNumber; // 自动回复的帖子编号（从草稿进入时使用）
+  final String? instanceId; // 外部指定的 provider 实例 ID（布局切换时复用）
 
   const TopicDetailPage({
     super.key,
@@ -68,6 +69,7 @@ class TopicDetailPage extends ConsumerStatefulWidget {
     this.autoSwitchToMasterDetail = false,
     this.autoOpenReply = false,
     this.autoReplyToPostNumber,
+    this.instanceId,
   });
 
   @override
@@ -76,7 +78,8 @@ class TopicDetailPage extends ConsumerStatefulWidget {
 
 class _TopicDetailPageState extends ConsumerState<TopicDetailPage> with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   /// 唯一实例 ID，确保每次打开页面都创建新的 provider 实例
-  final String _instanceId = const Uuid().v4();
+  /// 支持外部传入以在布局切换时复用同一个 provider
+  late final String _instanceId = widget.instanceId ?? const Uuid().v4();
 
   /// Provider 参数（简化重复创建）
   TopicDetailParams get _params => TopicDetailParams(
@@ -256,10 +259,16 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage> with WidgetsB
       return;
     }
 
+    if (_isAutoSwitching) return;
+
+    // 当前页面不在栈顶时（有其他页面覆盖），不更新状态也不触发导航
+    // 这样返回后能正确检测到布局变化并执行切换
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return;
+
     final previous = _lastCanShowDetailPane;
     _lastCanShowDetailPane = canShowDetailPane;
 
-    if (_isAutoSwitching) return;
     if (previous == null) {
       if (canShowDetailPane) {
         _switchToMasterDetail(detail);
@@ -287,6 +296,7 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage> with WidgetsB
         topicId: widget.topicId,
         initialTitle: detail?.title ?? widget.initialTitle,
         scrollToPostNumber: currentPostNumber,
+        instanceId: _instanceId,
       );
       navigator.pop();
     });

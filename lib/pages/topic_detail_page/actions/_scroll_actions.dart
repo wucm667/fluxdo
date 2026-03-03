@@ -27,6 +27,10 @@ extension _ScrollActions on _TopicDetailPageState {
   }
 
   void _updateStreamIndexForPostNumber(int postNumber) {
+    // 记录当前浏览位置，用于布局切换时恢复
+    _controller.updateCurrentPostNumber(postNumber);
+    ref.read(detailScrollPositionProvider(widget.topicId).notifier).state = postNumber;
+
     final params = _params;
     final detail = ref.read(topicDetailProvider(params)).value;
     if (detail == null) return;
