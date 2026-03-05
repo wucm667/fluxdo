@@ -891,6 +891,26 @@ class _TopicListState extends ConsumerState<_TopicList>
     final currentFilter = ref.watch(topicFilterProvider);
     final selectedTopicId = ref.watch(selectedTopicProvider).topicId;
     final providerKey = widget.categoryId;
+
+    // 排序/筛选变化时清除高亮和 incoming 状态
+    ref.listen(topicSortOrderProvider, (prev, next) {
+      if (prev != next) {
+        _highlightedTopicIds.clear();
+        ref.read(latestChannelProvider.notifier).clearNewTopicsForCategory(widget.categoryId);
+      }
+    });
+    ref.listen(topicSortAscendingProvider, (prev, next) {
+      if (prev != next) {
+        _highlightedTopicIds.clear();
+        ref.read(latestChannelProvider.notifier).clearNewTopicsForCategory(widget.categoryId);
+      }
+    });
+    ref.listen(topicFilterProvider, (prev, next) {
+      if (prev != next) {
+        _highlightedTopicIds.clear();
+      }
+    });
+
     final topicsAsync = ref.watch(topicListProvider(providerKey));
 
     return topicsAsync.when(
@@ -970,22 +990,26 @@ class _TopicListState extends ConsumerState<_TopicList>
                   final shouldHighlight = _highlightedTopicIds.contains(topic.id);
 
                   if (shouldHighlight) {
-                    return TweenAnimationBuilder<double>(
+                    final theme = Theme.of(context);
+                    // 卡片正常背景色（需与 TopicCard / CompactTopicCard 的默认 color 一致）
+                    final normalColor = topic.pinned
+                        ? theme.colorScheme.surfaceContainerLow.withValues(alpha: 0.5)
+                        : theme.cardTheme.color ?? theme.colorScheme.surfaceContainerHighest;
+                    final highlightColor = theme.colorScheme.primaryContainer.withValues(alpha: 0.3);
+                    return TweenAnimationBuilder<Color?>(
                       key: ValueKey('highlight_${topic.id}'),
-                      tween: Tween(begin: 0.3, end: 0.0),
+                      tween: ColorTween(begin: highlightColor, end: normalColor),
                       duration: const Duration(milliseconds: 2000),
                       curve: const Interval(0.2, 1.0, curve: Curves.easeOut),
                       onEnd: () => _highlightedTopicIds.remove(topic.id),
-                      builder: (context, opacity, _) {
+                      builder: (context, color, _) {
                         return buildTopicItem(
                           context: context,
                           topic: topic,
                           isSelected: topic.id == selectedTopicId,
                           onTap: () => _openTopic(topic),
                           enableLongPress: enableLongPress,
-                          highlightColor: Theme.of(context)
-                              .colorScheme.primaryContainer
-                              .withValues(alpha: opacity),
+                          highlightColor: color,
                         );
                       },
                     );
@@ -1044,6 +1068,14 @@ class _TopicListState extends ConsumerState<_TopicList>
               if (mounted && insertedIds.isNotEmpty) {
                 // 标记插入的话题以显示高亮动画
                 _highlightedTopicIds.addAll(insertedIds);
+                // 定时清除高亮，避免不可见卡片的动画无法触发 onEnd
+                final idsToRemove = insertedIds.toSet();
+                Future.delayed(const Duration(milliseconds: 2500), () {
+                  if (!mounted) return;
+                  final hadHighlights = _highlightedTopicIds.intersection(idsToRemove).isNotEmpty;
+                  _highlightedTopicIds.removeAll(idsToRemove);
+                  if (hadHighlights) setState(() {});
+                });
                 scrollController?.animateTo(
                   0,
                   duration: const Duration(milliseconds: 300),
