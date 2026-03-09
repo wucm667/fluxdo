@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/cdk_providers.dart';
 import '../pages/webview_page.dart';
 import '../services/network/exceptions/oauth_exception.dart';
+import 'common/loading_spinner.dart';
 
 class CdkBalanceCard extends ConsumerWidget {
   final bool compact;
@@ -24,15 +25,22 @@ class CdkBalanceCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cdkUserInfo = ref.watch(cdkUserInfoProvider);
 
-    // 有错误且无旧数据时显示错误卡片
-    if (cdkUserInfo.hasError && !cdkUserInfo.hasValue) {
+    // 授权过期时强制显示错误卡片（即使有旧数据缓存）；其他错误仅在无旧数据时显示
+    if (cdkUserInfo.hasError &&
+        (!cdkUserInfo.hasValue || cdkUserInfo.error is OAuthExpiredException)) {
       return _buildErrorCard(context, ref, cdkUserInfo.error!);
+    }
+
+    // 加载中且无实际数据时显示加载占位
+    if (cdkUserInfo.isLoading && cdkUserInfo.value == null) {
+      return _buildLoadingCard(context);
     }
 
     final userInfo = cdkUserInfo.value;
     if (userInfo == null) return const SizedBox.shrink();
 
     final theme = Theme.of(context);
+    final isRefreshing = cdkUserInfo.isLoading;
 
     if (inline) {
       return Material(
@@ -82,11 +90,17 @@ class CdkBalanceCard extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      color: theme.colorScheme.outline.withValues(alpha: 0.4),
-                      size: 20,
-                    ),
+                    if (isRefreshing)
+                      LoadingSpinner(
+                        size: 20,
+                        color: theme.colorScheme.tertiary,
+                      )
+                    else
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: theme.colorScheme.outline.withValues(alpha: 0.4),
+                        size: 20,
+                      ),
                   ],
                 ),
               ),
@@ -155,6 +169,13 @@ class CdkBalanceCard extends ConsumerWidget {
                   ),
                 ],
               ),
+              if (isRefreshing) ...[
+                const Spacer(),
+                LoadingSpinner(
+                  size: 20,
+                  color: theme.colorScheme.tertiary,
+                ),
+              ],
             ],
           ),
         ),
@@ -228,7 +249,12 @@ class CdkBalanceCard extends ConsumerWidget {
                           ),
                         ),
                       ),
-                      if (onDisable != null)
+                      if (isRefreshing)
+                        const LoadingSpinner(
+                          size: 30,
+                          color: Colors.white70,
+                        )
+                      else if (onDisable != null)
                         GestureDetector(
                           onTap: onDisable,
                           child: Container(
@@ -555,6 +581,149 @@ class CdkBalanceCard extends ConsumerWidget {
                     ),
                 ],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingCard(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (inline) {
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.tertiaryContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.token_rounded,
+                    size: 20,
+                    color: theme.colorScheme.onTertiaryContainer,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'CDK 积分',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ],
+            ),
+          ),
+          if (showDivider)
+            Padding(
+              padding: const EdgeInsets.only(left: 56),
+              child: Divider(
+                height: 1,
+                thickness: 0.5,
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
+              ),
+            ),
+        ],
+      );
+    }
+
+    if (compact) {
+      return Card(
+        elevation: 0,
+        color: theme.colorScheme.surfaceContainerLow,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2)),
+        ),
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.tertiaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.token_rounded,
+                  size: 20,
+                  color: theme.colorScheme.onTertiaryContainer,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'CDK 积分',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const Spacer(),
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // full 模式
+    return Card(
+      elevation: 8,
+      shadowColor: theme.colorScheme.tertiary.withValues(alpha: 0.3),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [theme.colorScheme.tertiary, theme.colorScheme.secondary],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.token_rounded, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'LINUX DO CDK',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
             ),
           ],
         ),

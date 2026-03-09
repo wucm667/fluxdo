@@ -39,6 +39,16 @@ class _MetaversePageState extends ConsumerState<MetaversePage> {
       _cdkEnabled = prefs.getBool(_cdkEnabledKey) ?? false;
       _isLoading = false;
     });
+    // 每次进入页面时刷新已启用服务的数据
+    // 先等 build() 完成，再调 refresh()，避免并发导致 build() 结果覆盖 refresh() 的错误状态
+    if (_ldcEnabled) {
+      await ref.read(ldcUserInfoProvider.future).catchError((_) => null);
+      ref.read(ldcUserInfoProvider.notifier).refresh();
+    }
+    if (_cdkEnabled) {
+      await ref.read(cdkUserInfoProvider.future).catchError((_) => null);
+      ref.read(cdkUserInfoProvider.notifier).refresh();
+    }
   }
 
   Future<void> _toggleLdc(bool value) async {
@@ -207,8 +217,6 @@ class _MetaversePageState extends ConsumerState<MetaversePage> {
       if (!mounted) return;
       final result = await service.authorize(context);
       if (result && mounted) {
-        // 授权成功后再清除旧缓存，然后拉取新数据
-        await ref.read(ldcUserInfoProvider.notifier).clear();
         ref.read(ldcUserInfoProvider.notifier).refresh();
         ToastService.showSuccess('LDC 重新授权成功');
       }
@@ -236,7 +244,6 @@ class _MetaversePageState extends ConsumerState<MetaversePage> {
       if (!mounted) return;
       final result = await service.authorize(context);
       if (result && mounted) {
-        await ref.read(cdkUserInfoProvider.notifier).clear();
         ref.read(cdkUserInfoProvider.notifier).refresh();
         ToastService.showSuccess('CDK 重新授权成功');
       }

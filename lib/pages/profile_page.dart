@@ -56,7 +56,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     _scrollController.addListener(_onScroll);
   }
 
-  /// 下拉刷新（显示 loading 指示器）
+  /// 下拉刷新
+  /// 注意：LDC/CDK provider 的 build() 中 ref.watch(currentUserProvider) 会在
+  /// currentUser 刷新后自动重建，无需显式调用 refresh()，否则会触发两次 loading
   Future<void> _refreshData() async {
     if (!mounted) return;
     setState(() => _isRefreshing = true);
@@ -159,7 +161,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     if (!mounted) return;
     final result = await service.authorize(context);
     if (result && mounted) {
-      await ref.read(ldcUserInfoProvider.notifier).clear();
       ref.read(ldcUserInfoProvider.notifier).refresh();
       ToastService.showSuccess('LDC 重新授权成功');
     }
@@ -175,7 +176,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     if (!mounted) return;
     final result = await service.authorize(context);
     if (result && mounted) {
-      await ref.read(cdkUserInfoProvider.notifier).clear();
       ref.read(cdkUserInfoProvider.notifier).refresh();
       ToastService.showSuccess('CDK 重新授权成功');
     }
@@ -332,8 +332,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 final ldcState = ref.watch(ldcUserInfoProvider);
                 final cdkState = ref.watch(cdkUserInfoProvider);
 
-                final showLdc = (ldcState.hasError && !ldcState.hasValue) || ldcState.value != null;
-                final showCdk = (cdkState.hasError && !cdkState.hasValue) || cdkState.value != null;
+                final showLdc = ldcState.isLoading || ldcState.hasError || ldcState.value != null;
+                final showCdk = cdkState.isLoading || cdkState.hasError || cdkState.value != null;
 
                 if (!showLdc && !showCdk) return const SizedBox.shrink();
 

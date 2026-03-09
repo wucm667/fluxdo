@@ -18,7 +18,7 @@ class LdcUserInfoNotifier extends AsyncNotifier<LdcUserInfo?> {
   @override
   Future<LdcUserInfo?> build() async {
     final prefs = await SharedPreferences.getInstance();
-    final currentUser = await ref.read(currentUserProvider.future);
+    final currentUser = await ref.watch(currentUserProvider.future);
     if (currentUser == null) {
       await _clearCache(prefs);
       return null;
@@ -45,6 +45,10 @@ class LdcUserInfoNotifier extends AsyncNotifier<LdcUserInfo?> {
 
     try {
       return await _fetchUserInfo();
+    } on OAuthExpiredException catch (_) {
+      // 授权过期：清除缓存，让错误状态透传到 UI
+      await _clearCache(prefs);
+      rethrow;
     } catch (e) {
       if (cachedInfo != null) return cachedInfo;
       rethrow;
