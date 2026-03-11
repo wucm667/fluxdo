@@ -461,6 +461,8 @@ class _AiProviderEditPageState extends ConsumerState<AiProviderEditPage> {
   }
 
   Widget _buildModelsCard(ThemeData theme) {
+    final enabledCount = _models.where((m) => m.enabled).length;
+
     return Card(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -477,13 +479,13 @@ class _AiProviderEditPageState extends ConsumerState<AiProviderEditPage> {
                       style: theme.textTheme.titleMedium
                           ?.copyWith(fontWeight: FontWeight.bold)),
                 ),
-                Text('${_models.where((m) => m.enabled).length}/${_models.length}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant)),
+                if (_models.isNotEmpty)
+                  Text('$enabledCount/${_models.length}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant)),
               ],
             ),
             const SizedBox(height: 12),
-            // 操作按钮
             Wrap(
               spacing: 8,
               children: [
@@ -507,8 +509,6 @@ class _AiProviderEditPageState extends ConsumerState<AiProviderEditPage> {
             ),
             if (_models.isNotEmpty) ...[
               const SizedBox(height: 12),
-              const Divider(height: 1),
-              // 用 Consumer 获取默认模型信息
               Consumer(
                 builder: (context, ref, _) {
                   final defaultKey = ref.watch(defaultAiModelKeyProvider);
@@ -525,103 +525,193 @@ class _AiProviderEditPageState extends ConsumerState<AiProviderEditPage> {
                       final isDefault = providerId != null &&
                           defaultKey == '$providerId:${model.id}';
 
-                      return ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                        onLongPress: _isEditing
-                            ? () => _setDefaultModel(
-                                ref, providerId!, model.id, isDefault)
-                            : null,
-                        title: Row(
-                          children: [
-                            if (isDefault)
-                              Padding(
-                                padding: const EdgeInsets.only(right: 4),
-                                child: Icon(Icons.star_rounded,
-                                    size: 16, color: Colors.amber[700]),
-                              ),
-                            Expanded(
-                              child: Text(model.name ?? model.id,
-                                  style: const TextStyle(fontSize: 14)),
-                            ),
-                            if (hasTestResult)
-                              Padding(
-                                padding: const EdgeInsets.only(right: 4),
-                                child: Icon(
-                                  testResult == null
-                                      ? Icons.check_circle
-                                      : Icons.error_outline,
-                                  size: 16,
-                                  color: testResult == null
-                                      ? Colors.green
-                                      : theme.colorScheme.error,
-                                ),
-                              ),
-                          ],
-                        ),
-                        subtitle: model.name != null
-                            ? Text(model.id,
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    color:
-                                        theme.colorScheme.onSurfaceVariant))
-                            : null,
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // 测试按钮
-                            IconButton(
-                              icon: isTesting
-                                  ? SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: theme.colorScheme.primary,
-                                      ),
-                                    )
-                                  : Icon(Icons.play_circle_outline,
-                                      size: 20,
-                                      color: theme.colorScheme.primary),
-                              tooltip: '测试模型',
-                              onPressed: isTesting
-                                  ? null
-                                  : () => _testModel(model.id),
-                              visualDensity: VisualDensity.compact,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                            ),
-                            const SizedBox(width: 4),
-                            Switch(
-                              value: model.enabled,
-                              onChanged: (val) {
-                                setState(() {
-                                  _models[index] =
-                                      model.copyWith(enabled: val);
-                                });
-                              },
-                            ),
-                            IconButton(
-                              icon: Icon(Icons.close,
-                                  size: 18,
-                                  color: theme.colorScheme.error),
-                              onPressed: () {
-                                setState(() {
-                                  _models.removeAt(index);
-                                });
-                              },
-                              visualDensity: VisualDensity.compact,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                            ),
-                          ],
-                        ),
+                      return _buildModelItem(
+                        theme: theme,
+                        ref: ref,
+                        model: model,
+                        index: index,
+                        providerId: providerId,
+                        isDefault: isDefault,
+                        isTesting: isTesting,
+                        testResult: testResult,
+                        hasTestResult: hasTestResult,
                       );
                     }).toList(),
                   );
                 },
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModelItem({
+    required ThemeData theme,
+    required WidgetRef ref,
+    required AiModel model,
+    required int index,
+    required String? providerId,
+    required bool isDefault,
+    required bool isTesting,
+    required String? testResult,
+    required bool hasTestResult,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          // 主行：模型名称 + 启用开关
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 6, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        model.name ?? model.id,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (model.name != null)
+                        Text(
+                          model.id,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontSize: 11,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  ),
+                ),
+                Transform.scale(
+                  scale: 0.85,
+                  child: Switch(
+                    value: model.enabled,
+                    onChanged: (val) {
+                      setState(() {
+                        _models[index] = model.copyWith(enabled: val);
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // 底部操作栏
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+            child: Row(
+              children: [
+                _ModelActionChip(
+                  icon: isTesting
+                      ? null
+                      : hasTestResult
+                          ? (testResult == null
+                              ? Icons.check_circle
+                              : Icons.error_outline)
+                          : Icons.play_arrow_rounded,
+                  label: '测试',
+                  isLoading: isTesting,
+                  highlightColor: hasTestResult && !isTesting
+                      ? (testResult == null ? Colors.green : theme.colorScheme.error)
+                      : null,
+                  onTap: isTesting ? null : () => _testModel(model.id),
+                ),
+                if (_isEditing) ...[
+                  const SizedBox(width: 8),
+                  _ModelActionChip(
+                    icon: isDefault ? Icons.star_rounded : Icons.star_outline_rounded,
+                    label: isDefault ? '取消默认' : '设为默认',
+                    highlightColor: isDefault ? Colors.amber[700] : null,
+                    onTap: () => _setDefaultModel(
+                        ref, providerId!, model.id, isDefault),
+                  ),
+                ],
+                const Spacer(),
+                _ModelActionChip(
+                  icon: Icons.delete_outline,
+                  label: '移除',
+                  isDestructive: true,
+                  onTap: () {
+                    setState(() {
+                      _models.removeAt(index);
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 模型操作小按钮
+class _ModelActionChip extends StatelessWidget {
+  final IconData? icon;
+  final String label;
+  final VoidCallback? onTap;
+  final bool isDestructive;
+  final bool isLoading;
+
+  final Color? highlightColor;
+
+  const _ModelActionChip({
+    this.icon,
+    required this.label,
+    this.onTap,
+    this.isDestructive = false,
+    this.isLoading = false,
+    this.highlightColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = highlightColor ??
+        (isDestructive
+            ? theme.colorScheme.error
+            : theme.colorScheme.onSurfaceVariant);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: isLoading
+                  ? CircularProgressIndicator(
+                      strokeWidth: 1.5,
+                      color: color,
+                    )
+                  : icon != null
+                      ? Icon(icon, size: 14, color: color)
+                      : const SizedBox.shrink(),
+            ),
+            const SizedBox(width: 3),
+            Text(
+              label,
+              style: TextStyle(fontSize: 12, color: color),
+            ),
           ],
         ),
       ),

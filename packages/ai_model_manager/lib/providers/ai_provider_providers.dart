@@ -8,12 +8,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/ai_provider.dart';
+import '../services/ai_chat_storage_service.dart';
 import '../services/ai_provider_service.dart';
 
 /// 需要主应用在 ProviderScope.overrides 中注入
 final aiSharedPreferencesProvider = Provider<SharedPreferences>((_) {
   throw UnimplementedError(
       'aiSharedPreferencesProvider 必须在 ProviderScope.overrides 中注入');
+});
+
+/// AI 聊天存储服务
+final aiChatStorageServiceProvider = Provider<AiChatStorageService>((ref) {
+  final prefs = ref.watch(aiSharedPreferencesProvider);
+  return AiChatStorageService(prefs);
 });
 
 /// 供应商列表状态管理

@@ -2,12 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/ai_provider.dart';
+import '../providers/ai_chat_providers.dart';
 import '../providers/ai_provider_providers.dart';
+import '../services/ai_chat_storage_service.dart';
+import '../widgets/swipe_action_cell.dart';
+import 'ai_chat_history_page.dart';
 import 'ai_provider_edit_page.dart';
 
 /// AI 供应商列表页面
 class AiProvidersPage extends ConsumerWidget {
-  const AiProvidersPage({super.key});
+  /// 点击会话时的回调，由外部实现导航逻辑
+  final OpenSessionCallback? onOpenSession;
+
+  const AiProvidersPage({super.key, this.onOpenSession});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -27,18 +34,48 @@ class AiProvidersPage extends ConsumerWidget {
       ),
       body: providers.isEmpty
           ? _buildEmptyState(context, theme)
-          : ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: providers.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                return _ProviderCard(
-                  provider: providers[index],
-                  onTap: () => _navigateToEdit(context, providers[index]),
-                  onDelete: () =>
-                      _confirmDelete(context, ref, providers[index]),
-                );
-              },
+          : SwipeActionScope(
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  // 供应商列表
+                  ...List.generate(providers.length, (index) {
+                    final provider = providers[index];
+                    return Padding(
+                      padding: EdgeInsets.only(
+                          bottom: index < providers.length - 1 ? 12 : 0),
+                      child: SwipeActionCell(
+                        key: ValueKey(provider.id),
+                        trailingActions: [
+                          SwipeAction(
+                            icon: Icons.edit_outlined,
+                            color: Colors.blue,
+                            label: '编辑',
+                            onPressed: () =>
+                                _navigateToEdit(context, provider),
+                          ),
+                          SwipeAction(
+                            icon: Icons.delete_outline,
+                            color: Colors.red,
+                            label: '删除',
+                            onPressed: () =>
+                                _confirmDelete(context, ref, provider),
+                          ),
+                        ],
+                        child: _ProviderCard(
+                          provider: provider,
+                          onTap: () =>
+                              _navigateToEdit(context, provider),
+                        ),
+                      ),
+                    );
+                  }),
+                  // 聊天设置
+                  const SizedBox(height: 24),
+                  _ChatSettingsSection(
+                      ref: ref, onOpenSession: onOpenSession),
+                ],
+              ),
             ),
     );
   }
@@ -110,12 +147,10 @@ class AiProvidersPage extends ConsumerWidget {
 class _ProviderCard extends StatelessWidget {
   final AiProvider provider;
   final VoidCallback onTap;
-  final VoidCallback onDelete;
 
   const _ProviderCard({
     required this.provider,
     required this.onTap,
-    required this.onDelete,
   });
 
   @override
@@ -124,75 +159,67 @@ class _ProviderCard extends StatelessWidget {
     final enabledCount = provider.models.where((m) => m.enabled).length;
     final totalCount = provider.models.length;
 
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onDelete,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              // 图标
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: _getTypeColor(provider.type).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  Icons.smart_toy_rounded,
-                  color: _getTypeColor(provider.type),
-                  size: 24,
-                ),
+    // 不包 Card，由外层 SwipeActionCell 提供容器
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: _getTypeColor(provider.type).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(width: 16),
-              // 内容
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      provider.name,
-                      style: theme.textTheme.titleSmall
-                          ?.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.secondaryContainer,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            provider.type.label,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                                color:
-                                    theme.colorScheme.onSecondaryContainer),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '$enabledCount/$totalCount 个模型',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+              child: Icon(
+                Icons.smart_toy_rounded,
+                color: _getTypeColor(provider.type),
+                size: 24,
               ),
-              Icon(Icons.chevron_right_rounded,
-                  color: theme.colorScheme.outline.withValues(alpha: 0.4),
-                  size: 20),
-            ],
-          ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    provider.name,
+                    style: theme.textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.secondaryContainer,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          provider.type.label,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                              color:
+                                  theme.colorScheme.onSecondaryContainer),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '$enabledCount/$totalCount 个模型',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                color: theme.colorScheme.outline.withValues(alpha: 0.4),
+                size: 20),
+          ],
         ),
       ),
     );
@@ -208,5 +235,258 @@ class _ProviderCard extends StatelessWidget {
       case AiProviderType.anthropic:
         return Colors.orange;
     }
+  }
+}
+
+/// 聊天设置区域
+class _ChatSettingsSection extends StatelessWidget {
+  final WidgetRef ref;
+  final OpenSessionCallback? onOpenSession;
+
+  const _ChatSettingsSection({required this.ref, this.onOpenSession});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final storageService = ref.watch(aiChatStorageServiceProvider);
+    final maxSessions = storageService.getMaxSessions();
+    final totalCount = storageService.getTotalSessionCount();
+
+    // 标题生成模型
+    final allModels = ref.watch(allAvailableAiModelsProvider);
+    final titleModel = ref.watch(aiTitleModelProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            '聊天记录',
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            children: [
+              // 标题生成模型
+              _SettingRow(
+                title: '标题生成模型',
+                subtitle: '自动为新会话生成标题',
+                trailing: GestureDetector(
+                  onTap: () => _showTitleModelPicker(
+                      context, allModels, titleModel),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 80),
+                          child: Text(
+                            titleModel != null
+                                ? (titleModel.model.name ??
+                                    titleModel.model.id)
+                                : '未设置',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        Icon(Icons.unfold_more,
+                            size: 14,
+                            color: theme.colorScheme.onSurfaceVariant),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const Divider(height: 1, indent: 16, endIndent: 16),
+              // 最大会话记录数
+              _SettingRow(
+                title: '最大会话记录数',
+                subtitle: '超出上限时自动删除最旧的会话',
+                trailing: GestureDetector(
+                  onTap: () =>
+                      _showMaxSessionsPicker(context, storageService, maxSessions),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '$maxSessions',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const Divider(height: 1, indent: 16, endIndent: 16),
+              // 会话记录管理
+              InkWell(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        AiChatHistoryPage(onOpenSession: onOpenSession),
+                  ),
+                ),
+                borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(12)),
+                child: _SettingRow(
+                  title: '会话记录管理',
+                  subtitle: '共 $totalCount 条会话',
+                  trailing: Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: theme.colorScheme.outline.withValues(alpha: 0.5),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showTitleModelPicker(
+    BuildContext context,
+    List<({AiProvider provider, AiModel model})> allModels,
+    ({AiProvider provider, AiModel model})? current,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            padding: EdgeInsets.zero,
+            children: [
+              ListTile(
+                title: const Text('不自动生成标题'),
+                trailing: current == null ? const Icon(Icons.check) : null,
+                onTap: () {
+                  setAiTitleModel(ref, null, null);
+                  Navigator.pop(ctx);
+                  (context as Element).markNeedsBuild();
+                },
+              ),
+              ...allModels.map((item) {
+                final isCurrent = current != null &&
+                    item.provider.id == current.provider.id &&
+                    item.model.id == current.model.id;
+                return ListTile(
+                  title: Text(item.model.name ?? item.model.id),
+                  subtitle: Text(item.provider.name),
+                  trailing: isCurrent ? const Icon(Icons.check) : null,
+                  onTap: () {
+                    setAiTitleModel(
+                        ref, item.provider.id, item.model.id);
+                    Navigator.pop(ctx);
+                    (context as Element).markNeedsBuild();
+                  },
+                );
+              }),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showMaxSessionsPicker(
+    BuildContext context,
+    AiChatStorageService storageService,
+    int currentValue,
+  ) {
+    final options = [10, 20, 30, 50, 100, 200];
+
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            padding: EdgeInsets.zero,
+            children: [
+              ...options.map((value) => ListTile(
+                    title: Text('$value'),
+                    trailing:
+                        value == currentValue ? const Icon(Icons.check) : null,
+                    onTap: () {
+                      storageService.setMaxSessions(value);
+                      Navigator.pop(ctx);
+                      (context as Element).markNeedsBuild();
+                    },
+                  )),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// 设置行通用组件
+class _SettingRow extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Widget trailing;
+
+  const _SettingRow({
+    required this.title,
+    required this.subtitle,
+    required this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: theme.textTheme.bodyMedium),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          trailing,
+        ],
+      ),
+    );
   }
 }

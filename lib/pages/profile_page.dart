@@ -24,6 +24,7 @@ import '../widgets/common/smart_avatar.dart';
 import '../providers/app_state_refresher.dart';
 import 'metaverse_page.dart';
 import 'package:ai_model_manager/ai_model_manager.dart';
+import 'topic_detail_page/topic_detail_page.dart';
 import 'drafts_page.dart';
 import 'invite_links_page.dart';
 import '../providers/ldc_providers.dart';
@@ -542,7 +543,17 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             icon: Icons.smart_toy_rounded,
             iconColor: Colors.cyan,
             title: 'AI 模型服务',
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiProvidersPage())),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AiProvidersPage(
+              onOpenSession: (ctx, topicId, sessionId) {
+                Navigator.push(ctx, MaterialPageRoute(
+                  builder: (_) => TopicDetailPage(
+                    topicId: topicId,
+                    autoOpenAiChat: true,
+                    initialSessionId: sessionId,
+                  ),
+                ));
+              },
+            ))),
           ),
           _buildOptionTile(
             icon: Icons.color_lens_rounded,

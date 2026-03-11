@@ -182,9 +182,9 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
 
   ({AiProvider provider, AiModel model})? _currentModel() {
     final selected = ref.read(topicSelectedAiModelProvider(widget.topicId));
-    final lastUsed = ref.read(lastUsedAiAssistantModelProvider);
     final defaultModel = ref.read(defaultAiModelProvider);
-    return selected ?? lastUsed ?? defaultModel;
+    final lastUsed = ref.read(lastUsedAiAssistantModelProvider);
+    return selected ?? defaultModel ?? lastUsed;
   }
 
   void _rememberModel(({AiProvider provider, AiModel model}) model) {
@@ -280,10 +280,27 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
                             );
                           },
                         ),
+                        IconButton(
+                          icon: const Icon(Icons.add_comment_outlined),
+                          tooltip: '新建会话',
+                          iconSize: 20,
+                          onPressed: () {
+                            chatNotifier.createNewSession();
+                          },
+                        ),
+                        if (chatState.sessions.isNotEmpty)
+                          IconButton(
+                            icon: const Icon(Icons.history),
+                            tooltip: '会话记录',
+                            iconSize: 20,
+                            onPressed: () => _showSessionHistory(
+                                context, chatState, chatNotifier),
+                          ),
                         if (chatState.messages.isNotEmpty)
                           IconButton(
                             icon: const Icon(Icons.delete_outline),
                             tooltip: '清空聊天',
+                            iconSize: 20,
                             onPressed: () =>
                                 _confirmClear(context, chatNotifier),
                           ),
@@ -335,7 +352,7 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
                       lastUsedAiAssistantModelProvider,
                     );
                     final defaultModel = ref.watch(defaultAiModelProvider);
-                    final current = selected ?? lastUsedModel ?? defaultModel;
+                    final current = selected ?? defaultModel ?? lastUsedModel;
                     if (allModels.length <= 1 || current == null) {
                       return const SizedBox.shrink();
                     }
@@ -463,6 +480,30 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
     );
   }
 
+  void _showSessionHistory(
+    BuildContext context,
+    TopicAiChatState chatState,
+    TopicAiChatNotifier notifier,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return _SessionHistorySheet(
+          sessions: chatState.sessions,
+          currentSessionId: chatState.currentSessionId,
+          onSwitch: (sessionId) {
+            notifier.switchSession(sessionId);
+            Navigator.pop(ctx);
+          },
+          onDelete: (sessionId) async {
+            await notifier.deleteSession(sessionId);
+          },
+        );
+      },
+    );
+  }
+
   void _confirmClear(BuildContext context, TopicAiChatNotifier notifier) {
     showDialog(
       context: context,
@@ -576,5 +617,152 @@ class _AiModelSelector extends StatelessWidget {
         }).toList();
       },
     );
+  }
+}
+
+/// 会话历史记录列表
+class _SessionHistorySheet extends StatefulWidget {
+  final List<AiChatSession> sessions;
+  final String? currentSessionId;
+  final ValueChanged<String> onSwitch;
+  final Future<void> Function(String) onDelete;
+
+  const _SessionHistorySheet({
+    required this.sessions,
+    required this.currentSessionId,
+    required this.onSwitch,
+    required this.onDelete,
+  });
+
+  @override
+  State<_SessionHistorySheet> createState() => _SessionHistorySheetState();
+}
+
+class _SessionHistorySheetState extends State<_SessionHistorySheet> {
+  late List<AiChatSession> _sessions;
+
+  @override
+  void initState() {
+    super.initState();
+    _sessions = List.of(widget.sessions);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.5,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 标题
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                children: [
+                  Text(
+                    '会话记录',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${_sessions.length} 条',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            // 列表
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _sessions.length,
+                itemBuilder: (context, index) {
+                  final session = _sessions[index];
+                  final isCurrent = session.id == widget.currentSessionId;
+
+                  return ListTile(
+                    leading: Icon(
+                      isCurrent
+                          ? Icons.chat_bubble
+                          : Icons.chat_bubble_outline,
+                      size: 20,
+                      color: isCurrent
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                    title: Text(
+                      _formatSessionTitle(session, index),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight:
+                            isCurrent ? FontWeight.w600 : FontWeight.normal,
+                        color: isCurrent
+                            ? theme.colorScheme.primary
+                            : null,
+                      ),
+                    ),
+                    subtitle: Text(
+                      _formatTime(session.updatedAt),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    trailing: isCurrent
+                        ? null
+                        : IconButton(
+                            icon: Icon(
+                              Icons.delete_outline,
+                              size: 18,
+                              color: theme.colorScheme.error,
+                            ),
+                            onPressed: () async {
+                              await widget.onDelete(session.id);
+                              if (!mounted) return;
+                              _sessions.removeWhere(
+                                  (s) => s.id == session.id);
+                              if (_sessions.isEmpty) {
+                                if (context.mounted) {
+                                  Navigator.pop(context);
+                                }
+                              } else {
+                                setState(() {});
+                              }
+                            },
+                          ),
+                    onTap: isCurrent
+                        ? null
+                        : () => widget.onSwitch(session.id),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatSessionTitle(AiChatSession session, int index) {
+    return session.title ?? '会话 ${_sessions.length - index}';
+  }
+
+  String _formatTime(DateTime time) {
+    final now = DateTime.now();
+    final diff = now.difference(time);
+
+    if (diff.inMinutes < 1) return '刚刚';
+    if (diff.inHours < 1) return '${diff.inMinutes} 分钟前';
+    if (diff.inDays < 1) return '${diff.inHours} 小时前';
+    if (diff.inDays < 30) return '${diff.inDays} 天前';
+
+    return '${time.month}/${time.day}';
   }
 }

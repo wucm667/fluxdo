@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../models/ai_provider.dart';
 import '../models/ai_chat_message.dart';
 import '../services/ai_chat_service.dart';
+import '../services/ai_chat_storage_service.dart';
 import 'ai_provider_providers.dart';
 
 const _lastUsedAiAssistantModelKey = 'ai_assistant_last_model';
@@ -108,6 +109,38 @@ final topicSelectedAiModelProvider = StateProvider.autoDispose
 /// AI 聊天服务
 final aiChatServiceProvider = Provider((_) => AiChatService());
 
+/// 标题生成模型 key（providerId:modelId）
+final aiTitleModelKeyProvider = StateProvider<String?>((ref) {
+  final storageService = ref.watch(aiChatStorageServiceProvider);
+  return storageService.getTitleModelKey();
+});
+
+/// 标题生成模型
+final aiTitleModelProvider =
+    Provider<({AiProvider provider, AiModel model})?>(
+  (ref) {
+    final all = ref.watch(allAvailableAiModelsProvider);
+    if (all.isEmpty) return null;
+
+    final key = ref.watch(aiTitleModelKeyProvider);
+    return _findAiModelByKey(all, key);
+  },
+);
+
+/// 设置标题生成模型
+Future<void> setAiTitleModel(
+    WidgetRef ref, String? providerId, String? modelId) async {
+  final storageService = ref.read(aiChatStorageServiceProvider);
+  if (providerId == null || modelId == null) {
+    await storageService.setTitleModelKey(null);
+    ref.read(aiTitleModelKeyProvider.notifier).state = null;
+  } else {
+    final key = '$providerId:$modelId';
+    await storageService.setTitleModelKey(key);
+    ref.read(aiTitleModelKeyProvider.notifier).state = key;
+  }
+}
+
 /// 话题 AI 上下文范围（独立管理，避免切换时影响消息列表滚动）
 final topicAiContextScopeProvider = StateProvider.autoDispose
     .family<ContextScope, int>((ref, topicId) => ContextScope.first5);
@@ -116,19 +149,27 @@ final topicAiContextScopeProvider = StateProvider.autoDispose
 class TopicAiChatState {
   final List<AiChatMessage> messages;
   final bool isGenerating;
+  final String? currentSessionId;
+  final List<AiChatSession> sessions;
 
   const TopicAiChatState({
     this.messages = const [],
     this.isGenerating = false,
+    this.currentSessionId,
+    this.sessions = const [],
   });
 
   TopicAiChatState copyWith({
     List<AiChatMessage>? messages,
     bool? isGenerating,
+    String? currentSessionId,
+    List<AiChatSession>? sessions,
   }) {
     return TopicAiChatState(
       messages: messages ?? this.messages,
       isGenerating: isGenerating ?? this.isGenerating,
+      currentSessionId: currentSessionId ?? this.currentSessionId,
+      sessions: sessions ?? this.sessions,
     );
   }
 }
@@ -165,7 +206,18 @@ final topicAiChatProvider = StateNotifierProvider.autoDispose
     .family<TopicAiChatNotifier, TopicAiChatState, int>(
   (ref, topicId) {
     final chatService = ref.watch(aiChatServiceProvider);
-    return TopicAiChatNotifier(chatService: chatService);
+    final storageService = ref.watch(aiChatStorageServiceProvider);
+    final titleModel = ref.read(aiTitleModelProvider);
+    final notifier = TopicAiChatNotifier(
+      chatService: chatService,
+      storageService: storageService,
+      topicId: topicId,
+      titleModel: titleModel,
+    );
+    ref.onDispose(() {
+      notifier.saveBeforeDispose();
+    });
+    return notifier;
   },
 );
 
@@ -173,9 +225,13 @@ class TopicAiChatNotifier extends StateNotifier<TopicAiChatState> {
   static const _uuid = Uuid();
 
   final AiChatService chatService;
+  final AiChatStorageService storageService;
+  final int topicId;
+  final ({AiProvider provider, AiModel model})? titleModel;
 
   StreamSubscription<String>? _streamSubscription;
   bool _cancelled = false;
+  bool _isGeneratingTitle = false;
 
   /// 缓存的上下文帖子（通过 fetchContextPosts 加载）
   List<TopicPostContext>? _cachedContextPosts;
@@ -183,7 +239,97 @@ class TopicAiChatNotifier extends StateNotifier<TopicAiChatState> {
 
   TopicAiChatNotifier({
     required this.chatService,
-  }) : super(const TopicAiChatState());
+    required this.storageService,
+    required this.topicId,
+    this.titleModel,
+  }) : super(const TopicAiChatState()) {
+    _loadFromStorage();
+  }
+
+  /// 从存储加载：读取话题会话列表，默认加载最新会话
+  void _loadFromStorage() {
+    final sessions = storageService.getTopicSessions(topicId);
+    if (sessions.isEmpty) return;
+
+    final latestSession = sessions.first;
+    final messages = storageService.loadSessionMessages(latestSession.id);
+    state = state.copyWith(
+      sessions: sessions,
+      currentSessionId: latestSession.id,
+      messages: messages,
+    );
+  }
+
+  /// 保存当前消息到存储
+  Future<void> _saveToStorage() async {
+    final sessionId = state.currentSessionId;
+    if (sessionId == null) return;
+    await storageService.saveSessionMessages(
+      topicId,
+      sessionId,
+      state.messages,
+      topicTitle: _cachedTitle,
+    );
+    // 刷新会话列表
+    state = state.copyWith(
+        sessions: storageService.getTopicSessions(topicId));
+  }
+
+  /// dispose 前保存（由 ref.onDispose 调用）
+  void saveBeforeDispose() {
+    final sessionId = state.currentSessionId;
+    if (sessionId == null || state.messages.isEmpty) return;
+    storageService.saveSessionMessages(
+      topicId,
+      sessionId,
+      state.messages,
+      topicTitle: _cachedTitle,
+    );
+  }
+
+  /// 创建新会话
+  void createNewSession() {
+    stopGeneration();
+    final sessionId = _uuid.v4();
+    state = state.copyWith(
+      currentSessionId: sessionId,
+      messages: [],
+    );
+  }
+
+  /// 切换到指定会话
+  void switchSession(String sessionId) {
+    if (sessionId == state.currentSessionId) return;
+    stopGeneration();
+    final messages = storageService.loadSessionMessages(sessionId);
+    state = state.copyWith(
+      currentSessionId: sessionId,
+      messages: messages,
+    );
+  }
+
+  /// 删除指定会话
+  Future<void> deleteSession(String sessionId) async {
+    await storageService.deleteSession(topicId, sessionId);
+    final sessions = storageService.getTopicSessions(topicId);
+
+    if (sessionId == state.currentSessionId) {
+      // 删除的是当前会话，切换到最新的或清空
+      if (sessions.isNotEmpty) {
+        final latest = sessions.first;
+        final messages = storageService.loadSessionMessages(latest.id);
+        state = state.copyWith(
+          sessions: sessions,
+          currentSessionId: latest.id,
+          messages: messages,
+        );
+      } else {
+        state = const TopicAiChatState();
+      }
+    } else {
+      state = state.copyWith(sessions: sessions);
+    }
+  }
 
   /// 设置上下文帖子缓存（由外部在加载完成后调用）
   void setContextPosts(String title, List<TopicPostContext> posts) {
@@ -200,6 +346,11 @@ class TopicAiChatNotifier extends StateNotifier<TopicAiChatState> {
     if (content.trim().isEmpty) return;
 
     _cancelled = false;
+
+    // 确保有当前会话
+    state = state.copyWith(
+      currentSessionId: state.currentSessionId ?? _uuid.v4(),
+    );
 
     // 添加用户消息
     final userMessage = AiChatMessage(
@@ -266,6 +417,8 @@ class TopicAiChatNotifier extends StateNotifier<TopicAiChatState> {
             MessageStatus.completed,
           );
           state = state.copyWith(isGenerating: false);
+          _saveToStorage();
+          _tryGenerateTitle();
         },
         onError: (error) {
           if (!mounted) return;
@@ -310,10 +463,19 @@ class TopicAiChatNotifier extends StateNotifier<TopicAiChatState> {
     state = state.copyWith(messages: messages, isGenerating: false);
   }
 
-  /// 清空消息
+  /// 清空当前会话的消息
   void clearMessages() {
     stopGeneration();
-    state = state.copyWith(messages: []);
+    final sessionId = state.currentSessionId;
+    if (sessionId != null) {
+      storageService.deleteSession(topicId, sessionId);
+    }
+    final sessions = storageService.getTopicSessions(topicId);
+    state = state.copyWith(
+      messages: [],
+      currentSessionId: null,
+      sessions: sessions,
+    );
   }
 
   /// 重试最后一条失败消息
@@ -447,6 +609,64 @@ class TopicAiChatNotifier extends StateNotifier<TopicAiChatState> {
         .replaceAll(RegExp(r'&nbsp;'), ' ')
         .replaceAll(RegExp(r'\n{3,}'), '\n\n')
         .trim();
+  }
+
+  /// 首次回复完成后自动生成会话标题
+  Future<void> _tryGenerateTitle() async {
+    final sessionId = state.currentSessionId;
+    if (sessionId == null || _isGeneratingTitle) return;
+
+    // 检查是否已有标题
+    final sessions = state.sessions;
+    final session = sessions.where((s) => s.id == sessionId).firstOrNull;
+    if (session?.title != null) return;
+
+    // 只在首次对话完成时生成（用户消息 + AI 回复 = 2条）
+    final completedMessages = state.messages
+        .where((m) => m.status == MessageStatus.completed && m.content.isNotEmpty)
+        .toList();
+    if (completedMessages.length != 2) return;
+
+    final model = titleModel;
+    if (model == null) return;
+
+    _isGeneratingTitle = true;
+
+    try {
+      final apiKey =
+          await AiProviderListNotifier.getApiKey(model.provider.id);
+      if (apiKey == null || !mounted) return;
+
+      final userMsg = completedMessages
+          .firstWhere((m) => m.role == ChatRole.user)
+          .content;
+
+      final titleStream = chatService.sendChatStream(
+        provider: model.provider,
+        model: model.model.id,
+        apiKey: apiKey,
+        messages: [
+          {'role': 'user', 'content': userMsg},
+        ],
+        systemPrompt: '请用不超过15个字概括用户这段话的主题，直接输出标题文字，不要加标点符号和引号。',
+      );
+
+      final buffer = StringBuffer();
+      await for (final token in titleStream) {
+        buffer.write(token);
+      }
+
+      final title = buffer.toString().trim();
+      if (title.isNotEmpty && mounted) {
+        await storageService.updateSessionTitle(topicId, sessionId, title);
+        state = state.copyWith(
+            sessions: storageService.getTopicSessions(topicId));
+      }
+    } catch (_) {
+      // 标题生成失败不影响正常使用
+    } finally {
+      _isGeneratingTitle = false;
+    }
   }
 
   @override

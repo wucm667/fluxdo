@@ -63,6 +63,8 @@ class TopicDetailPage extends ConsumerStatefulWidget {
   final bool autoOpenReply; // 自动打开回复框（从草稿进入时使用）
   final int? autoReplyToPostNumber; // 自动回复的帖子编号（从草稿进入时使用）
   final String? instanceId; // 外部指定的 provider 实例 ID（布局切换时复用）
+  final bool autoOpenAiChat; // 自动打开 AI 聊天面板
+  final String? initialSessionId; // AI 聊天初始会话 ID
 
   const TopicDetailPage({
     super.key,
@@ -74,6 +76,8 @@ class TopicDetailPage extends ConsumerStatefulWidget {
     this.autoOpenReply = false,
     this.autoReplyToPostNumber,
     this.instanceId,
+    this.autoOpenAiChat = false,
+    this.initialSessionId,
   });
 
   @override
@@ -119,6 +123,7 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage> with WidgetsB
   bool? _lastCanShowDetailPane;
   bool _isAutoSwitching = false;
   bool _autoOpenReplyHandled = false; // 是否已处理自动打开回复框
+  bool _autoOpenAiChatHandled = false; // 是否已处理自动打开 AI 聊天
   late final TopicSearchNotifier _topicSearchNotifier;
 
   @override
@@ -672,6 +677,22 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage> with WidgetsB
               }
               _handleReply(replyToPost);
             }
+          });
+        }
+
+        // 自动打开 AI 聊天面板（从会话历史进入时）
+        if (widget.autoOpenAiChat && !_autoOpenAiChatHandled) {
+          _autoOpenAiChatHandled = true;
+          final topicDetail = next.value!;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            // 如果指定了会话 ID，先切换到该会话
+            if (widget.initialSessionId != null) {
+              ref
+                  .read(topicAiChatProvider(widget.topicId).notifier)
+                  .switchSession(widget.initialSessionId!);
+            }
+            _showAiAssistantSheet(topicDetail);
           });
         }
       }
