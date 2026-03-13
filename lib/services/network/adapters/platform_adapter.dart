@@ -45,6 +45,13 @@ void configurePlatformAdapter(Dio dio) {
     // Windows: 始终使用 WebView 适配器
     _configureWebViewAdapter(dio);
     _currentAdapterType = AdapterType.webview;
+  } else if (Platform.isAndroid) {
+    dio.httpClientAdapter = _AndroidDynamicAdapter(
+      settings,
+      proxySettings,
+      fallbackService,
+    );
+    _currentAdapterType = _resolveAndroidAdapterType(settings, proxySettings, fallbackService);
   } else if (proxySettings.current.isValid) {
     // 用户 HTTP 代理启用: 使用 NetworkHttpAdapter
     debugPrint('[DIO] Using NetworkHttpAdapter (HTTP Proxy)');
@@ -102,4 +109,87 @@ void _configureNetworkAdapter(Dio dio, NetworkSettingsService settings, ProxySet
 void reconfigurePlatformAdapter(Dio dio) {
   dio.httpClientAdapter.close();
   configurePlatformAdapter(dio);
+}
+
+AdapterType _resolveAndroidAdapterType(
+  NetworkSettingsService settings,
+  ProxySettingsService proxySettings,
+  CronetFallbackService fallbackService,
+) {
+  // 代理或 DOH 启用时使用 NetworkHttpAdapter（通过本地 Rust 网关转发）
+  if (settings.shouldRunLocalProxy || fallbackService.hasFallenBack) {
+    return AdapterType.network;
+  }
+  return AdapterType.native;
+}
+
+class _AndroidDynamicAdapter implements HttpClientAdapter {
+  _AndroidDynamicAdapter(this._settings, this._proxySettings, this._fallbackService);
+
+  final NetworkSettingsService _settings;
+  final ProxySettingsService _proxySettings;
+  final CronetFallbackService _fallbackService;
+
+  HttpClientAdapter? _delegate;
+  AdapterType? _delegateType;
+  int _settingsVersion = -1;
+  int _proxyVersion = -1;
+  bool _hasFallenBack = false;
+  bool _closed = false;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) {
+    if (_closed) {
+      throw StateError("Can't establish connection after the adapter was closed.");
+    }
+    final delegate = _ensureDelegate();
+    return delegate.fetch(options, requestStream, cancelFuture);
+  }
+
+  HttpClientAdapter _ensureDelegate() {
+    final desiredType = _resolveAndroidAdapterType(
+      _settings,
+      _proxySettings,
+      _fallbackService,
+    );
+    final settingsVersion = _settings.version;
+    final proxyVersion = _proxySettings.version;
+    final hasFallenBack = _fallbackService.hasFallenBack;
+
+    final shouldRebuild = _delegate == null ||
+        _delegateType != desiredType ||
+        _settingsVersion != settingsVersion ||
+        _proxyVersion != proxyVersion ||
+        _hasFallenBack != hasFallenBack;
+
+    if (!shouldRebuild) {
+      return _delegate!;
+    }
+
+    _delegate?.close(force: true);
+    if (desiredType == AdapterType.network) {
+      _delegate = NetworkHttpAdapter(_settings, _proxySettings);
+      debugPrint('[DIO] Android dynamic adapter -> NetworkHttpAdapter');
+    } else {
+      _delegate = NativeAdapter();
+      debugPrint('[DIO] Android dynamic adapter -> NativeAdapter');
+    }
+
+    _delegateType = desiredType;
+    _settingsVersion = settingsVersion;
+    _proxyVersion = proxyVersion;
+    _hasFallenBack = hasFallenBack;
+    _currentAdapterType = desiredType;
+    return _delegate!;
+  }
+
+  @override
+  void close({bool force = false}) {
+    _closed = true;
+    _delegate?.close(force: force);
+  }
 }

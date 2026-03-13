@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 
@@ -17,9 +18,7 @@ class DohProxyFfi {
   bool _initialized = false;
 
   // FFI function types
-  late final int Function(int port, int preferIpv6) _dohProxyStart;
-  late final int Function(int port, int preferIpv6, Pointer<Utf8> dohServer)
-      _dohProxyStartWithServer;
+  late final int Function(Pointer<Utf8> configJson) _dohProxyStartWithConfigJson;
   late final void Function() _dohProxyStop;
   late final int Function() _dohProxyIsRunning;
   late final int Function() _dohProxyGetPort;
@@ -34,14 +33,9 @@ class DohProxyFfi {
       if (_lib == null) return false;
 
       // Load function pointers
-      _dohProxyStart = _lib!
-          .lookup<NativeFunction<Int32 Function(Int32, Int32)>>(
-              'doh_proxy_start')
-          .asFunction();
-
-      _dohProxyStartWithServer = _lib!
-          .lookup<NativeFunction<Int32 Function(Int32, Int32, Pointer<Utf8>)>>(
-              'doh_proxy_start_with_server')
+      _dohProxyStartWithConfigJson = _lib!
+          .lookup<NativeFunction<Int32 Function(Pointer<Utf8>)>>(
+              'doh_proxy_start_with_config_json')
           .asFunction();
 
       _dohProxyStop = _lib!
@@ -99,22 +93,47 @@ class DohProxyFfi {
   /// [port] - Port to bind (0 for auto-select)
   /// [preferIpv6] - Whether to prefer IPv6 addresses
   /// [dohServer] - DOH server URL (null for default Cloudflare)
-  int start({int port = 0, bool preferIpv6 = false, String? dohServer}) {
+  int start({
+    int port = 0,
+    bool enableDoh = true,
+    bool preferIpv6 = false,
+    String? dohServer,
+    String? upstreamProtocol,
+    String? upstreamHost,
+    int? upstreamPort,
+    String? upstreamUsername,
+    String? upstreamPassword,
+    String? upstreamCipher,
+  }) {
     if (!_initialized && !initialize()) {
       return -1;
     }
 
-    if (dohServer != null && dohServer.isNotEmpty) {
-      // Use the new API with DOH server
-      final dohServerPtr = dohServer.toNativeUtf8();
-      try {
-        return _dohProxyStartWithServer(port, preferIpv6 ? 1 : 0, dohServerPtr);
-      } finally {
-        calloc.free(dohServerPtr);
-      }
-    } else {
-      // Use the legacy API (defaults to Cloudflare)
-      return _dohProxyStart(port, preferIpv6 ? 1 : 0);
+    final configJson = jsonEncode({
+      'bind_addr': '127.0.0.1',
+      'bind_port': port,
+      'enable_doh': enableDoh,
+      'doh_server': dohServer ?? 'cloudflare',
+      'prefer_ipv6': preferIpv6,
+      'timeout_secs': 30,
+      if (upstreamHost != null && upstreamHost.isNotEmpty && upstreamPort != null && upstreamPort > 0)
+        'upstream_proxy': {
+          'protocol': upstreamProtocol ?? 'http',
+          'host': upstreamHost,
+          'port': upstreamPort,
+          if (upstreamCipher != null && upstreamCipher.isNotEmpty)
+            'cipher': upstreamCipher,
+          if (upstreamUsername != null && upstreamUsername.isNotEmpty)
+            'username': upstreamUsername,
+          if (upstreamPassword != null && upstreamPassword.isNotEmpty)
+            'password': upstreamPassword,
+        },
+    });
+    final configPtr = configJson.toNativeUtf8();
+    try {
+      return _dohProxyStartWithConfigJson(configPtr);
+    } finally {
+      calloc.free(configPtr);
     }
   }
 

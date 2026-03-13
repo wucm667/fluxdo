@@ -25,9 +25,11 @@ class DohProxyService {
   // 共享状态
   int? _port;
   bool _isRunning = false;
+  bool? _currentEnableDoh;
   String? _currentDohServer;
   bool? _currentPreferIPv6;
   int? _currentPreferredPort;
+  String? _currentUpstreamSignature;
   String? _lastError;
   // ignore: unused_field
   Isolate? _ffiIsolate; // 保持引用防止 GC
@@ -50,13 +52,30 @@ class DohProxyService {
   /// [dohServer] - DOH 服务器 URL（null 为默认 Cloudflare）
   Future<bool> start({
     int preferredPort = 0,
+    bool enableDoh = true,
     bool preferIPv6 = false,
     String? dohServer,
+    String? upstreamProtocol,
+    String? upstreamHost,
+    int? upstreamPort,
+    String? upstreamUsername,
+    String? upstreamPassword,
+    String? upstreamCipher,
   }) async {
+    final upstreamSignature = _buildUpstreamSignature(
+      protocol: upstreamProtocol,
+      host: upstreamHost,
+      port: upstreamPort,
+      username: upstreamUsername,
+      password: upstreamPassword,
+      cipher: upstreamCipher,
+    );
     if (_isRunning) {
-      final sameConfig = _currentDohServer == dohServer
+      final sameConfig = _currentEnableDoh == enableDoh
+          && _currentDohServer == dohServer
           && _currentPreferIPv6 == preferIPv6
-          && _currentPreferredPort == preferredPort;
+          && _currentPreferredPort == preferredPort
+          && _currentUpstreamSignature == upstreamSignature;
       if (sameConfig) {
         NetworkLogger.log('[DOH] 代理已在运行，端口: $_port');
         return true;
@@ -69,24 +88,66 @@ class DohProxyService {
 
     // 根据平台选择启动方式
     if (DohProxyFfi.isAvailable) {
-      return _startWithFfi(preferredPort, preferIPv6, dohServer);
+      return _startWithFfi(
+        preferredPort,
+        enableDoh,
+        preferIPv6,
+        dohServer,
+        upstreamProtocol,
+        upstreamHost,
+        upstreamPort,
+        upstreamUsername,
+        upstreamPassword,
+        upstreamCipher,
+      );
     } else {
-      return _startWithProcess(preferredPort, preferIPv6, dohServer);
+      return _startWithProcess(
+        preferredPort,
+        enableDoh,
+        preferIPv6,
+        dohServer,
+        upstreamProtocol,
+        upstreamHost,
+        upstreamPort,
+        upstreamUsername,
+        upstreamPassword,
+        upstreamCipher,
+      );
     }
   }
 
   /// 使用 FFI 启动代理（Android/iOS）
-  Future<bool> _startWithFfi(int port, bool preferIPv6, String? dohServer) async {
+  Future<bool> _startWithFfi(
+    int port,
+    bool enableDoh,
+    bool preferIPv6,
+    String? dohServer,
+    String? upstreamProtocol,
+    String? upstreamHost,
+    int? upstreamPort,
+    String? upstreamUsername,
+    String? upstreamPassword,
+    String? upstreamCipher,
+  ) async {
     try {
       return await _enqueueFfiOp(() async {
-        NetworkLogger.log('[DOH] 使用 FFI 启动代理，DOH 服务器: ${dohServer ?? "cloudflare"}');
+        NetworkLogger.log(
+          '[DOH] 使用 FFI 启动代理，模式: ${enableDoh ? "DoH 网关" : "纯上游代理"}',
+        );
 
         _currentPreferredPort = port;
         await _ensureFfiStopped();
         final resultPort = await _callFfiStart(
           port: port,
+          enableDoh: enableDoh,
           preferIpv6: preferIPv6,
           dohServer: dohServer,
+          upstreamProtocol: upstreamProtocol,
+          upstreamHost: upstreamHost,
+          upstreamPort: upstreamPort,
+          upstreamUsername: upstreamUsername,
+          upstreamPassword: upstreamPassword,
+          upstreamCipher: upstreamCipher,
         );
         if (resultPort <= 0) {
           // _callFfiStart 已设置更详细的 _lastError，仅在未设置时补充
@@ -97,9 +158,18 @@ class DohProxyService {
 
         _port = resultPort;
         _isRunning = true;
+        _currentEnableDoh = enableDoh;
         _currentDohServer = dohServer;
         _currentPreferIPv6 = preferIPv6;
         _currentPreferredPort = port;
+        _currentUpstreamSignature = _buildUpstreamSignature(
+          protocol: upstreamProtocol,
+          host: upstreamHost,
+          port: upstreamPort,
+          username: upstreamUsername,
+          password: upstreamPassword,
+          cipher: upstreamCipher,
+        );
         NetworkLogger.log('[DOH] FFI 代理已启动，端口: $_port');
         return true;
       });
@@ -111,7 +181,18 @@ class DohProxyService {
   }
 
   /// 使用进程启动代理（桌面平台）
-  Future<bool> _startWithProcess(int preferredPort, bool preferIPv6, String? dohServer) async {
+  Future<bool> _startWithProcess(
+    int preferredPort,
+    bool enableDoh,
+    bool preferIPv6,
+    String? dohServer,
+    String? upstreamProtocol,
+    String? upstreamHost,
+    int? upstreamPort,
+    String? upstreamUsername,
+    String? upstreamPassword,
+    String? upstreamCipher,
+  ) async {
     try {
       final executablePath = await _getExecutablePath();
       if (executablePath == null) {
@@ -120,15 +201,40 @@ class DohProxyService {
         return false;
       }
 
-      NetworkLogger.log('[DOH] 启动代理进程: $executablePath, DOH: ${dohServer ?? "cloudflare"}');
+      NetworkLogger.log(
+        '[DOH] 启动代理进程: $executablePath, 模式: ${enableDoh ? "DoH 网关" : "纯上游代理"}',
+      );
 
       // 构建命令行参数
       final args = <String>[
         preferredPort.toString(),
+        if (!enableDoh) '--no-doh',
         if (preferIPv6) '--ipv6',
         if (dohServer != null && dohServer.isNotEmpty) ...[
           '--doh',
           dohServer,
+        ],
+        if (upstreamHost != null && upstreamHost.isNotEmpty) ...[
+          '--upstream-protocol',
+          upstreamProtocol ?? 'http',
+          '--upstream-host',
+          upstreamHost,
+          if (upstreamPort != null) ...[
+            '--upstream-port',
+            upstreamPort.toString(),
+          ],
+          if (upstreamCipher != null && upstreamCipher.isNotEmpty) ...[
+            '--upstream-cipher',
+            upstreamCipher,
+          ],
+          if (upstreamUsername != null && upstreamUsername.isNotEmpty) ...[
+            '--upstream-user',
+            upstreamUsername,
+          ],
+          if (upstreamPassword != null && upstreamPassword.isNotEmpty) ...[
+            '--upstream-pass',
+            upstreamPassword,
+          ],
         ],
       ];
 
@@ -150,9 +256,18 @@ class DohProxyService {
         if (match != null && !completed) {
           _port = int.tryParse(match.group(1) ?? '');
           _isRunning = true;
+          _currentEnableDoh = enableDoh;
           _currentDohServer = dohServer;
           _currentPreferIPv6 = preferIPv6;
           _currentPreferredPort = preferredPort;
+          _currentUpstreamSignature = _buildUpstreamSignature(
+            protocol: upstreamProtocol,
+            host: upstreamHost,
+            port: upstreamPort,
+            username: upstreamUsername,
+            password: upstreamPassword,
+            cipher: upstreamCipher,
+          );
           NetworkLogger.log('[DOH] 代理已启动，端口: $_port');
           completed = true;
           completer.complete(true);
@@ -248,9 +363,11 @@ class DohProxyService {
     _process = null;
     _port = null;
     _isRunning = false;
+    _currentEnableDoh = null;
     _currentDohServer = null;
     _currentPreferIPv6 = null;
     _currentPreferredPort = null;
+    _currentUpstreamSignature = null;
     // 注意：不清除 _lastError，保留用于 UI 展示
   }
 
@@ -311,16 +428,30 @@ class DohProxyService {
 
   Future<int> _callFfiStart({
     required int port,
+    required bool enableDoh,
     required bool preferIpv6,
     required String? dohServer,
+    required String? upstreamProtocol,
+    required String? upstreamHost,
+    required int? upstreamPort,
+    required String? upstreamUsername,
+    required String? upstreamPassword,
+    required String? upstreamCipher,
   }) async {
     final sendPort = await _ensureFfiIsolate();
     final response = ReceivePort();
     sendPort.send({
       'cmd': 'start',
       'port': port,
+      'enableDoh': enableDoh,
       'preferIpv6': preferIpv6,
       'dohServer': dohServer,
+      'upstreamProtocol': upstreamProtocol,
+      'upstreamHost': upstreamHost,
+      'upstreamPort': upstreamPort,
+      'upstreamUsername': upstreamUsername,
+      'upstreamPassword': upstreamPassword,
+      'upstreamCipher': upstreamCipher,
       'preferredPort': port,
       'replyTo': response.sendPort,
     });
@@ -379,6 +510,27 @@ class DohProxyService {
     NetworkLogger.log('[DOH] FFI 停止超时，可能仍占用端口');
   }
 
+  String? _buildUpstreamSignature({
+    required String? protocol,
+    required String? host,
+    required int? port,
+    required String? username,
+    required String? password,
+    required String? cipher,
+  }) {
+    if (host == null || host.isEmpty || port == null || port <= 0) {
+      return null;
+    }
+    return jsonEncode({
+      'protocol': protocol ?? 'http',
+      'host': host,
+      'port': port,
+      'username': username ?? '',
+      'password': password ?? '',
+      'cipher': cipher ?? '',
+    });
+  }
+
   Future<SendPort> _ensureFfiIsolate() async {
     if (_ffiSendPort != null) return _ffiSendPort!;
     final readyPort = ReceivePort();
@@ -410,18 +562,39 @@ void _ffiIsolateEntry(SendPort mainSendPort) {
         case 'start':
           final portValue = message['port'] as int? ?? 0;
           final preferredPort = message['preferredPort'] as int? ?? 0;
+          final enableDoh = message['enableDoh'] as bool? ?? true;
           final preferIpv6 = message['preferIpv6'] as bool? ?? false;
           final dohServer = message['dohServer'] as String?;
+          final upstreamProtocol = message['upstreamProtocol'] as String?;
+          final upstreamHost = message['upstreamHost'] as String?;
+          final upstreamPort = message['upstreamPort'] as int?;
+          final upstreamUsername = message['upstreamUsername'] as String?;
+          final upstreamPassword = message['upstreamPassword'] as String?;
+          final upstreamCipher = message['upstreamCipher'] as String?;
           var resultPort = DohProxyFfi.instance.start(
             port: portValue,
+            enableDoh: enableDoh,
             preferIpv6: preferIpv6,
             dohServer: dohServer,
+            upstreamProtocol: upstreamProtocol,
+            upstreamHost: upstreamHost,
+            upstreamPort: upstreamPort,
+            upstreamUsername: upstreamUsername,
+            upstreamPassword: upstreamPassword,
+            upstreamCipher: upstreamCipher,
           );
           if (resultPort <= 0 && preferredPort != 0) {
             resultPort = DohProxyFfi.instance.start(
               port: 0,
+              enableDoh: enableDoh,
               preferIpv6: preferIpv6,
               dohServer: dohServer,
+              upstreamProtocol: upstreamProtocol,
+              upstreamHost: upstreamHost,
+              upstreamPort: upstreamPort,
+              upstreamUsername: upstreamUsername,
+              upstreamPassword: upstreamPassword,
+              upstreamCipher: upstreamCipher,
             );
           }
           if (resultPort <= 0) {
