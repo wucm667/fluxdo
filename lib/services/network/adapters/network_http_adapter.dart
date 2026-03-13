@@ -179,45 +179,21 @@ class NetworkHttpAdapter implements HttpClientAdapter {
     final client = HttpClient(context: context)
       ..idleTimeout = const Duration(seconds: 30);
     final dohSettings = _settings.current;
-    final proxySettings = _proxySettings.current;
-
-    // 优先使用用户设置的 HTTP 代理
-    if (proxySettings.isValid) {
-      final host = proxySettings.host;
-      final port = proxySettings.port;
-      final proxy = 'PROXY $host:$port';
-      client.findProxy = (_) => proxy;
-
-      // 添加代理认证
-      final username = proxySettings.username;
-      final password = proxySettings.password;
-      if (username != null &&
-          username.isNotEmpty &&
-          password != null &&
-          password.isNotEmpty) {
-        client.addProxyCredentials(
-          host,
-          port,
-          'Basic',
-          HttpClientBasicCredentials(username, password),
-        );
+    if (_shouldUseLocalGateway) {
+      final proxyPort = dohSettings.proxyPort;
+      if (proxyPort != null) {
+        client.findProxy = (_) => 'PROXY 127.0.0.1:$proxyPort';
       }
       return client;
-    }
-
-    // 使用 DOH 代理端口（Rust 代理统一处理 DOH + ECH）
-    final proxyPort = dohSettings.proxyPort;
-    if (dohSettings.dohEnabled && proxyPort != null) {
-      final proxy = 'PROXY 127.0.0.1:$proxyPort';
-      client.findProxy = (_) => proxy;
     }
 
     return client;
   }
 
   bool _shouldTrustProxyCa() {
-    final settings = _settings.current;
-    return settings.dohEnabled && settings.proxyPort != null && _proxyCaBytes != null;
+    return _shouldUseLocalGateway &&
+        _settings.current.dohEnabled &&
+        _proxyCaBytes != null;
   }
 
   SecurityContext? _buildSecurityContext() {
@@ -235,8 +211,7 @@ class NetworkHttpAdapter implements HttpClientAdapter {
   }
 
   Future<void> _ensureProxyCaLoaded() async {
-    final settings = _settings.current;
-    if (!settings.dohEnabled || settings.proxyPort == null) {
+    if (!_shouldUseLocalGateway) {
       return;
     }
     if (_proxyCaBytes != null) {
@@ -259,5 +234,11 @@ class NetworkHttpAdapter implements HttpClientAdapter {
   void close({bool force = false}) {
     _closed = true;
     _cachedClient?.close(force: force);
+  }
+
+  bool get _shouldUseLocalGateway {
+    final settings = _settings.current;
+    return settings.proxyPort != null &&
+        (settings.dohEnabled || _proxySettings.current.isValid);
   }
 }

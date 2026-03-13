@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 
 import '../../../services/network/doh/doh_resolver.dart';
 import '../../../services/network/doh/network_settings_service.dart';
-import '../../../services/network/proxy/proxy_settings_service.dart';
 import '../../../services/toast_service.dart';
 
 /// DOH 设置卡片（含服务器列表和测速）
@@ -64,12 +63,6 @@ class _DohSettingsCardState extends State<DohSettingsCard> {
             ),
             value: settings.dohEnabled,
             onChanged: (value) async {
-              if (value) {
-                 final proxyService = ProxySettingsService.instance;
-                 if (proxyService.notifier.value.enabled) {
-                   await proxyService.setEnabled(false);
-                 }
-              }
               await _service.setDohEnabled(value);
             },
           ),

@@ -65,7 +65,7 @@ class _NetworkSettingsPageState extends State<NetworkSettingsPage> {
           body: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             children: [
-              // HTTP 代理设置（与 DOH 互斥）
+              // 上游 HTTP 代理设置（由本地网关统一转发）
               HttpProxyCard(
                 proxySettings: proxySettings,
                 dohEnabled: settings.dohEnabled,

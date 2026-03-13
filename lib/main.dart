@@ -90,12 +90,12 @@ Future<void> main() async {
   await Future.wait([
     CfChallengeLogger.setEnabled(prefs.getBool('developer_mode') ?? false),
     CronetFallbackService.instance.initialize(prefs),
-    NetworkSettingsService.instance.initialize(prefs),
     ProxySettingsService.instance.initialize(prefs),
     if (Platform.isAndroid && crashlyticsEnabled)
       const MethodChannel('com.github.lingyan000.fluxdo/crashlytics')
           .invokeMethod('setCrashlyticsEnabled', {'enabled': true}),
   ]);
+  await NetworkSettingsService.instance.initialize(prefs);
 
   // 冷启动自动清除图片缓存（如果用户开启了该选项）
   if (prefs.getBool('pref_clear_cache_on_exit') == true) {
