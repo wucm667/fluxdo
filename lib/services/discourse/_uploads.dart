@@ -161,70 +161,94 @@ mixin _UploadsMixin on _DiscourseServiceBase {
     return false;
   }
 
-  /// 上传图片
+  /// 上传图片（内置速率限制重试）
   Future<UploadResult> uploadImage(String filePath) async {
-    try {
-      final fileName = filePath.split('/').last;
+    const maxRetries = 3;
 
-      final formData = FormData.fromMap({
-        'upload_type': 'composer',
-        'synchronous': true,
-        'file': await MultipartFile.fromFile(filePath, filename: fileName),
-      });
+    for (int attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        final fileName = filePath.split('/').last;
 
-      final response = await _dio.post(
-        '/uploads.json',
-        queryParameters: {'client_id': MessageBusService().clientId},
-        data: formData,
-      );
+        final formData = FormData.fromMap({
+          'upload_type': 'composer',
+          'synchronous': true,
+          'file': await MultipartFile.fromFile(filePath, filename: fileName),
+        });
 
-      final data = response.data;
-      if (data is Map) {
-        final shortUrl = data['short_url'] as String?;
-        if (shortUrl != null) {
-          return UploadResult(
-            shortUrl: shortUrl,
-            url: data['url'] as String?,
-            originalFilename: data['original_filename'] as String? ?? fileName,
-            width: data['width'] as int?,
-            height: data['height'] as int?,
-            thumbnailWidth: data['thumbnail_width'] as int?,
-            thumbnailHeight: data['thumbnail_height'] as int?,
+        final response = await _dio.post(
+          '/uploads.json',
+          queryParameters: {'client_id': MessageBusService().clientId},
+          data: formData,
+          options: Options(extra: {'showErrorToast': attempt >= maxRetries}),  // 仅最后一次尝试才弹 toast
+        );
+
+        final data = response.data;
+        if (data is Map) {
+          final shortUrl = data['short_url'] as String?;
+          if (shortUrl != null) {
+            return UploadResult(
+              shortUrl: shortUrl,
+              url: data['url'] as String?,
+              originalFilename:
+                  data['original_filename'] as String? ?? fileName,
+              width: data['width'] as int?,
+              height: data['height'] as int?,
+              thumbnailWidth: data['thumbnail_width'] as int?,
+              thumbnailHeight: data['thumbnail_height'] as int?,
+            );
+          }
+          // 兜底：使用完整 URL
+          final url = data['url'] as String?;
+          if (url != null) {
+            return UploadResult(
+              shortUrl: url,
+              url: url,
+              originalFilename:
+                  data['original_filename'] as String? ?? fileName,
+              width: data['width'] as int?,
+              height: data['height'] as int?,
+              thumbnailWidth: data['thumbnail_width'] as int?,
+              thumbnailHeight: data['thumbnail_height'] as int?,
+            );
+          }
+        }
+
+        throw Exception(S.current.error_uploadNoUrl);
+      } on DioException catch (e) {
+        debugPrint('[DiscourseService] Upload image failed: $e');
+
+        // ErrorInterceptor 将 429 throw 为 RateLimitException，
+        // Dio 会将其包装在 DioException.error 中
+        final innerError = e.error;
+        if (innerError is RateLimitException && attempt < maxRetries) {
+          final waitSeconds = innerError.retryAfterSeconds ?? 10;
+          debugPrint(
+            '[DiscourseService] 速率限制，等待 ${waitSeconds}s 后重试 '
+            '(${attempt + 1}/$maxRetries)',
           );
+          await Future.delayed(Duration(seconds: waitSeconds));
+          continue;
         }
-        // 兜底：使用完整 URL
-        final url = data['url'] as String?;
-        if (url != null) {
-          return UploadResult(
-            shortUrl: url,
-            url: url,
-            originalFilename: data['original_filename'] as String? ?? fileName,
-            width: data['width'] as int?,
-            height: data['height'] as int?,
-            thumbnailWidth: data['thumbnail_width'] as int?,
-            thumbnailHeight: data['thumbnail_height'] as int?,
-          );
-        }
-      }
 
-      throw Exception(S.current.error_uploadNoUrl);
-    } on DioException catch (e) {
-      debugPrint('[DiscourseService] Upload image failed: $e');
-      if (e.response?.statusCode == 413) {
-        throw Exception(S.current.error_imageTooBig);
-      }
-      if (e.response?.statusCode == 422) {
-        final data = e.response?.data;
-        if (data is Map && data['errors'] != null) {
-          throw Exception((data['errors'] as List).join('\n'));
+        if (e.response?.statusCode == 413) {
+          throw Exception(S.current.error_imageTooBig);
         }
-        throw Exception(S.current.error_imageFormatUnsupported);
+        if (e.response?.statusCode == 422) {
+          final data = e.response?.data;
+          if (data is Map && data['errors'] != null) {
+            throw Exception((data['errors'] as List).join('\n'));
+          }
+          throw Exception(S.current.error_imageFormatUnsupported);
+        }
+        rethrow;
+      } catch (e) {
+        debugPrint('[DiscourseService] Upload image failed: $e');
+        rethrow;
       }
-      rethrow;
-    } catch (e) {
-      debugPrint('[DiscourseService] Upload image failed: $e');
-      rethrow;
     }
+
+    // 不可达，但编译器需要
+    throw Exception(S.current.error_uploadNoUrl);
   }
 
   /// 批量解析 short_url

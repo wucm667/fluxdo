@@ -68,6 +68,7 @@ class MarkdownToolbar extends StatefulWidget {
 class MarkdownToolbarState extends State<MarkdownToolbar> {
   final _picker = ImagePicker();
   int _uploadingCount = 0;
+  String? _uploadProgress; // 批量上传进度，如 "3/22"
   bool get _isUploading => _uploadingCount > 0;
 
   @override
@@ -740,13 +741,16 @@ class MarkdownToolbarState extends State<MarkdownToolbar> {
       try {
         final service = DiscourseService();
 
-        // 并行上传所有图片
-        final futures = results.map((result) async {
+        // 串行上传，避免触发服务端速率限制
+        final markdowns = <String>[];
+        for (int i = 0; i < results.length; i++) {
+          final result = results[i];
+          if (mounted) {
+            setState(() => _uploadProgress = '${i + 1}/${results.length}');
+          }
           final uploadResult = await service.uploadImage(result.path);
-          return uploadResult.toMarkdown(alt: result.originalName);
-        }).toList();
-
-        final markdowns = await Future.wait(futures);
+          markdowns.add(uploadResult.toMarkdown(alt: result.originalName));
+        }
 
         if (!mounted) return;
 
@@ -766,7 +770,10 @@ class MarkdownToolbarState extends State<MarkdownToolbar> {
         }
       } finally {
         if (mounted) {
-          setState(() => _uploadingCount -= count);
+          setState(() {
+            _uploadingCount -= count;
+            _uploadProgress = null;
+          });
         }
       }
     } on DioException catch (_) {
@@ -829,6 +836,7 @@ class MarkdownToolbarState extends State<MarkdownToolbar> {
                           icon: FontAwesomeIcons.image,
                           onPressed: _isUploading ? null : _pickAndUploadImages,
                           isLoading: _isUploading,
+                          label: _uploadProgress,
                         ),
                         // 标题按钮（带弹出菜单）
                         PopupMenuButton<int>(
@@ -941,28 +949,47 @@ class _ToolbarButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool isLoading;
   final String? tooltip;
+  final String? label;
 
   const _ToolbarButton({
     required this.icon,
     this.onPressed,
     this.isLoading = false,
     this.tooltip,
+    this.label,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    Widget child;
+    if (isLoading && label != null) {
+      // 批量上传进度：显示 "3/22" 文本
+      child = Text(
+        label!,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: theme.colorScheme.primary,
+        ),
+      );
+    } else if (isLoading) {
+      child = const SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    } else {
+      child = FaIcon(icon, size: 16);
+    }
+
     return IconButton(
-      icon: isLoading
-          ? const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : FaIcon(icon, size: 16),
+      icon: child,
       onPressed: onPressed,
       tooltip: tooltip,
       style: IconButton.styleFrom(
-        foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+        foregroundColor: theme.colorScheme.onSurfaceVariant,
       ),
     );
   }
