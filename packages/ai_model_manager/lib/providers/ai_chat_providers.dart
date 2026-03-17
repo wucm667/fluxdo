@@ -108,7 +108,13 @@ final topicSelectedAiModelProvider = StateProvider.autoDispose
 );
 
 /// AI 聊天服务
-final aiChatServiceProvider = Provider((_) => AiChatService());
+final aiChatServiceProvider = Provider((ref) {
+  final useAppNetwork = ref.watch(aiUseAppNetworkProvider);
+  final adapterFactory = ref.watch(aiDioAdapterFactoryProvider);
+  return AiChatService(
+    adapterFactory: useAppNetwork ? adapterFactory : null,
+  );
+});
 
 /// 标题生成模型 key（providerId:modelId）
 final aiTitleModelKeyProvider = StateProvider<String?>((ref) {

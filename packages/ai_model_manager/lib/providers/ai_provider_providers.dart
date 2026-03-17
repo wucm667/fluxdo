@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // ignore: depend_on_referenced_packages
 import 'package:flutter_riverpod/legacy.dart';
@@ -17,6 +18,17 @@ final aiSharedPreferencesProvider = Provider<SharedPreferences>((_) {
       'aiSharedPreferencesProvider 必须在 ProviderScope.overrides 中注入');
 });
 
+/// 可选的 HttpClientAdapter 工厂，由主应用在 ProviderScope.overrides 中注入
+/// 用于让 AI 请求复用应用的网络配置（代理等）
+final aiDioAdapterFactoryProvider =
+    Provider<HttpClientAdapter Function()?>((_) => null);
+
+/// 是否跟随应用网络配置
+final aiUseAppNetworkProvider = StateProvider<bool>((ref) {
+  final prefs = ref.watch(aiSharedPreferencesProvider);
+  return prefs.getBool('ai_use_app_network') ?? false;
+});
+
 /// AI 聊天存储服务
 final aiChatStorageServiceProvider = Provider<AiChatStorageService>((ref) {
   final prefs = ref.watch(aiSharedPreferencesProvider);
@@ -31,7 +43,13 @@ final aiProviderListProvider =
 });
 
 /// API 服务
-final aiProviderApiServiceProvider = Provider((_) => AiProviderApiService());
+final aiProviderApiServiceProvider = Provider((ref) {
+  final useAppNetwork = ref.watch(aiUseAppNetworkProvider);
+  final adapterFactory = ref.watch(aiDioAdapterFactoryProvider);
+  return AiProviderApiService(
+    adapterFactory: useAppNetwork ? adapterFactory : null,
+  );
+});
 
 /// 默认 AI 模型 key（providerId:modelId）
 final defaultAiModelKeyProvider = StateProvider<String?>((ref) {

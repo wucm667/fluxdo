@@ -8,11 +8,20 @@ import 'sse_transformer.dart';
 
 /// AI 聊天服务，支持流式响应
 class AiChatService {
+  final HttpClientAdapter Function()? _adapterFactory;
+
+  AiChatService({HttpClientAdapter Function()? adapterFactory})
+      : _adapterFactory = adapterFactory;
+
   Dio _createDio() {
-    return Dio(BaseOptions(
+    final dio = Dio(BaseOptions(
       connectTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(minutes: 5),
     ));
+    if (_adapterFactory != null) {
+      dio.httpClientAdapter = _adapterFactory!();
+    }
+    return dio;
   }
 
   /// 发送聊天消息并返回流式响应

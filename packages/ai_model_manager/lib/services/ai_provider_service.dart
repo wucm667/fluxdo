@@ -6,6 +6,11 @@ import '../models/ai_provider.dart';
 
 /// AI 供应商 API 服务
 class AiProviderApiService {
+  final HttpClientAdapter Function()? _adapterFactory;
+
+  AiProviderApiService({HttpClientAdapter Function()? adapterFactory})
+      : _adapterFactory = adapterFactory;
+
   /// 从 DioException 中提取用户友好的错误信息
   static String friendlyError(Object error) {
     final l10n = AiL10n.current;
@@ -65,10 +70,14 @@ class AiProviderApiService {
   ];
 
   Dio _createDio() {
-    return Dio(BaseOptions(
+    final dio = Dio(BaseOptions(
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 15),
     ));
+    if (_adapterFactory != null) {
+      dio.httpClientAdapter = _adapterFactory!();
+    }
+    return dio;
   }
 
   /// 拉取模型列表

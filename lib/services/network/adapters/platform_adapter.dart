@@ -42,6 +42,20 @@ String getAdapterDisplayName(AdapterType type) {
   }
 }
 
+/// 创建一个 HttpClientAdapter，用于外部服务（如 AI 请求）复用应用网络配置
+HttpClientAdapter createExternalHttpAdapter() {
+  final settings = NetworkSettingsService.instance;
+  final proxySettings = ProxySettingsService.instance;
+  final fallbackService = CronetFallbackService.instance;
+  final rhttpSettings = RhttpSettingsService.instance;
+
+  if (Platform.isWindows) {
+    return IOHttpClientAdapter();
+  }
+
+  return _DynamicAdapter(settings, proxySettings, fallbackService, rhttpSettings);
+}
+
 /// 配置平台适配器
 void configurePlatformAdapter(Dio dio) {
   final settings = NetworkSettingsService.instance;

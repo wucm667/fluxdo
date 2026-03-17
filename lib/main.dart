@@ -54,6 +54,7 @@ import 'providers/connectivity_provider.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ai_model_manager/ai_model_manager.dart';
+import 'services/network/adapters/platform_adapter.dart';
 import 'providers/preferences_provider.dart';
 import 'providers/theme_provider.dart';
 import 'package:dynamic_color/dynamic_color.dart';
@@ -230,6 +231,8 @@ Future<void> main() async {
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
         aiSharedPreferencesProvider.overrideWithValue(prefs),
+        aiDioAdapterFactoryProvider
+            .overrideWithValue(createExternalHttpAdapter),
       ],
       child: const MainApp(),
     ),

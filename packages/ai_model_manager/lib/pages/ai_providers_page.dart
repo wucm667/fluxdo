@@ -71,6 +71,9 @@ class AiProvidersPage extends ConsumerWidget {
                       ),
                     );
                   }),
+                  // 网络设置
+                  const SizedBox(height: 24),
+                  _NetworkSettingsSection(ref: ref),
                   // 聊天设置
                   const SizedBox(height: 24),
                   _ChatSettingsSection(
@@ -446,6 +449,38 @@ class _ChatSettingsSection extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// 网络设置区域
+class _NetworkSettingsSection extends StatelessWidget {
+  final WidgetRef ref;
+
+  const _NetworkSettingsSection({required this.ref});
+
+  @override
+  Widget build(BuildContext context) {
+    final useAppNetwork = ref.watch(aiUseAppNetworkProvider);
+    final hasAdapterFactory = ref.watch(aiDioAdapterFactoryProvider) != null;
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: SwitchListTile(
+        title: Text(AiL10n.current.useAppNetwork),
+        subtitle: Text(AiL10n.current.useAppNetworkSubtitle),
+        value: useAppNetwork && hasAdapterFactory,
+        onChanged: hasAdapterFactory
+            ? (value) async {
+                final prefs = ref.read(aiSharedPreferencesProvider);
+                await prefs.setBool('ai_use_app_network', value);
+                ref.read(aiUseAppNetworkProvider.notifier).state = value;
+              }
+            : null,
+      ),
     );
   }
 }
