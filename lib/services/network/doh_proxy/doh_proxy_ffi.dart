@@ -3,8 +3,25 @@ import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
+
+class DohHostLookupResult {
+  const DohHostLookupResult({
+    required this.ips,
+    required this.ttl,
+    this.preferredIp,
+    this.echConfig,
+  });
+
+  final List<String> ips;
+  final String? preferredIp;
+  final Uint8List? echConfig;
+  final Duration ttl;
+
+  bool get hasData => ips.isNotEmpty || (echConfig?.isNotEmpty ?? false);
+}
 
 /// DOH Proxy FFI bindings
 ///
@@ -23,6 +40,30 @@ class DohProxyFfi {
   late final int Function() _dohProxyIsRunning;
   late final int Function() _dohProxyGetPort;
   late final void Function() _dohProxyInitLogging;
+  late final Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>) _dohProxyLookupEchConfig;
+  late final Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, int) _dohProxyLookupIp;
+  late final Pointer<Utf8> Function(
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+    int,
+    int,
+  ) _dohProxyLookupHost;
+  late final int Function() _dohProxyClearDnsCache;
+  late final int Function(
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+    int,
+    Pointer<Utf8>,
+  ) _dohProxyRecordHostSuccess;
+  late final int Function(
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+    int,
+  ) _dohProxyClearPreferredHostIp;
+  late final void Function(Pointer<Utf8>) _dohProxyFreeString;
 
   /// Initialize FFI bindings
   bool initialize() {
@@ -54,6 +95,63 @@ class DohProxyFfi {
           .lookup<NativeFunction<Void Function()>>('doh_proxy_init_logging')
           .asFunction();
 
+      _dohProxyLookupEchConfig = _lib!
+          .lookup<NativeFunction<Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>)>>(
+              'doh_proxy_lookup_ech_config')
+          .asFunction();
+
+      _dohProxyLookupIp = _lib!
+          .lookup<
+              NativeFunction<
+                  Pointer<Utf8> Function(
+                      Pointer<Utf8>,
+                      Pointer<Utf8>,
+                      Int32)>>('doh_proxy_lookup_ip')
+          .asFunction();
+
+      _dohProxyLookupHost = _lib!
+          .lookup<
+              NativeFunction<
+                  Pointer<Utf8> Function(
+                    Pointer<Utf8>,
+                    Pointer<Utf8>,
+                    Pointer<Utf8>,
+                    Int32,
+                    Int32,
+                  )>>('doh_proxy_lookup_host')
+          .asFunction();
+
+      _dohProxyClearDnsCache = _lib!
+          .lookup<NativeFunction<Int32 Function()>>('doh_proxy_clear_dns_cache')
+          .asFunction();
+
+      _dohProxyRecordHostSuccess = _lib!
+          .lookup<
+              NativeFunction<
+                  Int32 Function(
+                    Pointer<Utf8>,
+                    Pointer<Utf8>,
+                    Pointer<Utf8>,
+                    Int32,
+                    Pointer<Utf8>,
+                  )>>('doh_proxy_record_host_success')
+          .asFunction();
+
+      _dohProxyClearPreferredHostIp = _lib!
+          .lookup<
+              NativeFunction<
+                  Int32 Function(
+                    Pointer<Utf8>,
+                    Pointer<Utf8>,
+                    Pointer<Utf8>,
+                    Int32,
+                  )>>('doh_proxy_clear_preferred_host_ip')
+          .asFunction();
+
+      _dohProxyFreeString = _lib!
+          .lookup<NativeFunction<Void Function(Pointer<Utf8>)>>('doh_proxy_free_string')
+          .asFunction();
+
       _initialized = true;
       return true;
     } catch (e) {
@@ -73,7 +171,7 @@ class DohProxyFfi {
       } else if (Platform.isWindows) {
         return DynamicLibrary.open('doh_proxy.dll');
       } else if (Platform.isMacOS) {
-        return DynamicLibrary.open('libdoh_proxy.dylib');
+        return _loadMacOSLibrary();
       } else if (Platform.isLinux) {
         return DynamicLibrary.open('libdoh_proxy.so');
       }
@@ -82,6 +180,39 @@ class DohProxyFfi {
       debugPrint('[DOH FFI] $lastInitError');
     }
     return null;
+  }
+
+  DynamicLibrary? _loadMacOSLibrary() {
+    const libName = 'libdoh_proxy.dylib';
+    final execPath = Platform.resolvedExecutable;
+    final execDir = File(execPath).parent.path;
+    // Platform.resolvedExecutable 在 macOS 指向 fluxdo.app/Contents/MacOS/fluxdo
+    // dylib 位于 fluxdo.app/Contents/Frameworks/libdoh_proxy.dylib
+    final candidates = <String>[
+      '$execDir/../Frameworks/$libName',
+      // 开发时：从 app bundle 路径反推项目根目录
+      // build/macos/Build/Products/Debug/fluxdo.app/Contents/MacOS/ → 项目根
+      ...() {
+        // 尝试在路径中找到 /build/macos/ 来定位项目根目录
+        final buildIdx = execPath.indexOf('/build/macos/');
+        if (buildIdx > 0) {
+          final projectRoot = execPath.substring(0, buildIdx);
+          return [
+            '$projectRoot/core/doh_proxy/target/release/$libName',
+            '$projectRoot/core/doh_proxy/target/debug/$libName',
+          ];
+        }
+        return <String>[];
+      }(),
+    ];
+    for (final path in candidates) {
+      if (File(path).existsSync()) {
+        debugPrint('[DOH FFI] 加载 macOS 库: $path');
+        return DynamicLibrary.open(path);
+      }
+    }
+    // 最后尝试系统搜索路径
+    return DynamicLibrary.open(libName);
   }
 
   /// 最近一次初始化失败的原因
@@ -97,7 +228,9 @@ class DohProxyFfi {
     int port = 0,
     bool enableDoh = true,
     bool preferIpv6 = false,
+    bool gatewayMode = false,
     String? dohServer,
+    String? dohServerEch,
     String? serverIp,
     String? upstreamProtocol,
     String? upstreamHost,
@@ -114,9 +247,12 @@ class DohProxyFfi {
       'bind_addr': '127.0.0.1',
       'bind_port': port,
       'enable_doh': enableDoh,
+      'gateway_mode': gatewayMode,
       'doh_server': dohServer ?? 'cloudflare',
       'prefer_ipv6': preferIpv6,
       'timeout_secs': 30,
+      if (dohServerEch != null && dohServerEch.isNotEmpty)
+        'doh_server_ech': dohServerEch,
       if (serverIp != null && serverIp.isNotEmpty)
         'server_ip': serverIp,
       if (upstreamHost != null && upstreamHost.isNotEmpty && upstreamPort != null && upstreamPort > 0)
@@ -137,6 +273,182 @@ class DohProxyFfi {
       return _dohProxyStartWithConfigJson(configPtr);
     } finally {
       calloc.free(configPtr);
+    }
+  }
+
+  /// Lookup ECH config for a host via DOH DNS HTTPS record.
+  /// Returns raw ECH config bytes, or null if not available.
+  Uint8List? lookupEchConfig(String host, String dohServer) {
+    if (!_initialized && !initialize()) return null;
+
+    final hostPtr = host.toNativeUtf8();
+    final dohPtr = dohServer.toNativeUtf8();
+    try {
+      final resultPtr = _dohProxyLookupEchConfig(hostPtr, dohPtr);
+      if (resultPtr == nullptr) return null;
+
+      final jsonStr = resultPtr.toDartString();
+      _dohProxyFreeString(resultPtr);
+
+      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+      if (map['ok'] == true && map['data'] is String) {
+        return base64Decode(map['data'] as String);
+      }
+      debugPrint('[DOH FFI] ECH lookup: ${map['error'] ?? 'unknown error'}');
+      return null;
+    } finally {
+      calloc.free(hostPtr);
+      calloc.free(dohPtr);
+    }
+  }
+
+  /// Lookup IP addresses for a host via DOH A/AAAA records.
+  /// Returns ordered IP strings, or null on failure.
+  List<String>? lookupIp(String host, String dohServer, {bool preferIpv6 = false}) {
+    if (!_initialized && !initialize()) return null;
+
+    final hostPtr = host.toNativeUtf8();
+    final dohPtr = dohServer.toNativeUtf8();
+    try {
+      final resultPtr = _dohProxyLookupIp(hostPtr, dohPtr, preferIpv6 ? 1 : 0);
+      if (resultPtr == nullptr) return null;
+
+      final jsonStr = resultPtr.toDartString();
+      _dohProxyFreeString(resultPtr);
+
+      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+      if (map['ok'] == true && map['data'] is List) {
+        return (map['data'] as List)
+            .map((value) => value.toString())
+            .where((value) => value.isNotEmpty)
+            .toList();
+      }
+      debugPrint('[DOH FFI] IP lookup: ${map['error'] ?? 'unknown error'}');
+      return null;
+    } finally {
+      calloc.free(hostPtr);
+      calloc.free(dohPtr);
+    }
+  }
+
+  DohHostLookupResult? lookupHost(
+    String host,
+    String dohServer, {
+    String? dohServerEch,
+    bool preferIpv6 = false,
+    bool forceRefresh = false,
+  }) {
+    if (!_initialized && !initialize()) return null;
+
+    final hostPtr = host.toNativeUtf8();
+    final dohPtr = dohServer.toNativeUtf8();
+    final hasEchPtr = dohServerEch != null && dohServerEch.isNotEmpty;
+    final echPtr = hasEchPtr ? dohServerEch.toNativeUtf8() : nullptr.cast<Utf8>();
+    try {
+      final resultPtr = _dohProxyLookupHost(
+        hostPtr,
+        dohPtr,
+        echPtr,
+        preferIpv6 ? 1 : 0,
+        forceRefresh ? 1 : 0,
+      );
+      if (resultPtr == nullptr) return null;
+
+      final jsonStr = resultPtr.toDartString();
+      _dohProxyFreeString(resultPtr);
+
+      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+      if (map['ok'] == true) {
+        final ips = ((map['ips'] as List?) ?? const [])
+            .map((value) => value.toString())
+            .where((value) => value.isNotEmpty)
+            .toList();
+        final ttlSecs = (map['ttl_secs'] as num?)?.toInt() ?? 300;
+        final echBase64 = map['ech']?.toString();
+        return DohHostLookupResult(
+          ips: ips,
+          preferredIp: map['preferred_ip']?.toString(),
+          echConfig: echBase64 != null && echBase64.isNotEmpty
+              ? base64Decode(echBase64)
+              : null,
+          ttl: Duration(seconds: ttlSecs),
+        );
+      }
+      debugPrint('[DOH FFI] Host lookup: ${map['error'] ?? 'unknown error'}');
+      return null;
+    } finally {
+      calloc.free(hostPtr);
+      calloc.free(dohPtr);
+      if (hasEchPtr) {
+        calloc.free(echPtr);
+      }
+    }
+  }
+
+  bool clearDnsCache() {
+    if (!_initialized && !initialize()) return false;
+    return _dohProxyClearDnsCache() != 0;
+  }
+
+  bool recordHostSuccess(
+    String host,
+    String dohServer, {
+    String? dohServerEch,
+    bool preferIpv6 = false,
+    required String ip,
+  }) {
+    if (!_initialized && !initialize()) return false;
+
+    final hostPtr = host.toNativeUtf8();
+    final dohPtr = dohServer.toNativeUtf8();
+    final hasEchPtr = dohServerEch != null && dohServerEch.isNotEmpty;
+    final echPtr = hasEchPtr ? dohServerEch.toNativeUtf8() : nullptr.cast<Utf8>();
+    final ipPtr = ip.toNativeUtf8();
+    try {
+      return _dohProxyRecordHostSuccess(
+            hostPtr,
+            dohPtr,
+            echPtr,
+            preferIpv6 ? 1 : 0,
+            ipPtr,
+          ) !=
+          0;
+    } finally {
+      calloc.free(hostPtr);
+      calloc.free(dohPtr);
+      calloc.free(ipPtr);
+      if (hasEchPtr) {
+        calloc.free(echPtr);
+      }
+    }
+  }
+
+  bool clearPreferredHostIp(
+    String host,
+    String dohServer, {
+    String? dohServerEch,
+    bool preferIpv6 = false,
+  }) {
+    if (!_initialized && !initialize()) return false;
+
+    final hostPtr = host.toNativeUtf8();
+    final dohPtr = dohServer.toNativeUtf8();
+    final hasEchPtr = dohServerEch != null && dohServerEch.isNotEmpty;
+    final echPtr = hasEchPtr ? dohServerEch.toNativeUtf8() : nullptr.cast<Utf8>();
+    try {
+      return _dohProxyClearPreferredHostIp(
+            hostPtr,
+            dohPtr,
+            echPtr,
+            preferIpv6 ? 1 : 0,
+          ) !=
+          0;
+    } finally {
+      calloc.free(hostPtr);
+      calloc.free(dohPtr);
+      if (hasEchPtr) {
+        calloc.free(echPtr);
+      }
     }
   }
 
@@ -166,7 +478,12 @@ class DohProxyFfi {
 
   /// Check if FFI is available on this platform
   static bool get isAvailable {
-    return Platform.isAndroid || Platform.isIOS;
+    return Platform.isAndroid || Platform.isIOS || Platform.isMacOS;
+  }
+
+  /// 桌面平台 FFI 失败时可以回退到进程模式
+  static bool get canFallbackToProcess {
+    return Platform.isMacOS || Platform.isWindows || Platform.isLinux;
   }
 }
 

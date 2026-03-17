@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
 
@@ -26,9 +27,12 @@ class DohProxyService {
   int? _port;
   bool _isRunning = false;
   bool? _currentEnableDoh;
+  bool? _currentGatewayMode;
   String? _currentDohServer;
+  String? _currentDohServerEch;
   bool? _currentPreferIPv6;
   int? _currentPreferredPort;
+  String? _currentServerIp;
   String? _currentUpstreamSignature;
   String? _lastError;
   // ignore: unused_field
@@ -54,7 +58,9 @@ class DohProxyService {
     int preferredPort = 0,
     bool enableDoh = true,
     bool preferIPv6 = false,
+    bool gatewayMode = false,
     String? dohServer,
+    String? dohServerEch,
     String? serverIp,
     String? upstreamProtocol,
     String? upstreamHost,
@@ -73,9 +79,12 @@ class DohProxyService {
     );
     if (_isRunning) {
       final sameConfig = _currentEnableDoh == enableDoh
+          && _currentGatewayMode == gatewayMode
           && _currentDohServer == dohServer
+          && _currentDohServerEch == dohServerEch
           && _currentPreferIPv6 == preferIPv6
           && _currentPreferredPort == preferredPort
+          && _currentServerIp == serverIp
           && _currentUpstreamSignature == upstreamSignature;
       if (sameConfig) {
         NetworkLogger.log('[DOH] 代理已在运行，端口: $_port');
@@ -89,11 +98,13 @@ class DohProxyService {
 
     // 根据平台选择启动方式
     if (DohProxyFfi.isAvailable) {
-      return _startWithFfi(
+      final result = await _startWithFfi(
         preferredPort,
         enableDoh,
+        gatewayMode,
         preferIPv6,
         dohServer,
+        dohServerEch,
         serverIp,
         upstreamProtocol,
         upstreamHost,
@@ -102,12 +113,35 @@ class DohProxyService {
         upstreamPassword,
         upstreamCipher,
       );
+      // 桌面平台 FFI 加载失败时，回退到进程模式
+      if (!result && DohProxyFfi.canFallbackToProcess) {
+        NetworkLogger.log('[DOH] FFI 启动失败，尝试进程模式');
+        _lastError = null;
+        return _startWithProcess(
+          preferredPort,
+          enableDoh,
+          gatewayMode,
+          preferIPv6,
+          dohServer,
+          dohServerEch,
+          serverIp,
+          upstreamProtocol,
+          upstreamHost,
+          upstreamPort,
+          upstreamUsername,
+          upstreamPassword,
+          upstreamCipher,
+        );
+      }
+      return result;
     } else {
       return _startWithProcess(
         preferredPort,
         enableDoh,
+        gatewayMode,
         preferIPv6,
         dohServer,
+        dohServerEch,
         serverIp,
         upstreamProtocol,
         upstreamHost,
@@ -123,8 +157,10 @@ class DohProxyService {
   Future<bool> _startWithFfi(
     int port,
     bool enableDoh,
+    bool gatewayMode,
     bool preferIPv6,
     String? dohServer,
+    String? dohServerEch,
     String? serverIp,
     String? upstreamProtocol,
     String? upstreamHost,
@@ -144,8 +180,10 @@ class DohProxyService {
         final resultPort = await _callFfiStart(
           port: port,
           enableDoh: enableDoh,
+          gatewayMode: gatewayMode,
           preferIpv6: preferIPv6,
           dohServer: dohServer,
+          dohServerEch: dohServerEch,
           serverIp: serverIp,
           upstreamProtocol: upstreamProtocol,
           upstreamHost: upstreamHost,
@@ -164,9 +202,12 @@ class DohProxyService {
         _port = resultPort;
         _isRunning = true;
         _currentEnableDoh = enableDoh;
+        _currentGatewayMode = gatewayMode;
         _currentDohServer = dohServer;
+        _currentDohServerEch = dohServerEch;
         _currentPreferIPv6 = preferIPv6;
         _currentPreferredPort = port;
+        _currentServerIp = serverIp;
         _currentUpstreamSignature = _buildUpstreamSignature(
           protocol: upstreamProtocol,
           host: upstreamHost,
@@ -189,8 +230,10 @@ class DohProxyService {
   Future<bool> _startWithProcess(
     int preferredPort,
     bool enableDoh,
+    bool gatewayMode,
     bool preferIPv6,
     String? dohServer,
+    String? dohServerEch,
     String? serverIp,
     String? upstreamProtocol,
     String? upstreamHost,
@@ -215,10 +258,15 @@ class DohProxyService {
       final args = <String>[
         preferredPort.toString(),
         if (!enableDoh) '--no-doh',
+        if (gatewayMode) '--gateway',
         if (preferIPv6) '--ipv6',
         if (dohServer != null && dohServer.isNotEmpty) ...[
           '--doh',
           dohServer,
+        ],
+        if (dohServerEch != null && dohServerEch.isNotEmpty) ...[
+          '--doh-server-ech',
+          dohServerEch,
         ],
         if (serverIp != null && serverIp.isNotEmpty) ...[
           '--server-ip',
@@ -267,9 +315,12 @@ class DohProxyService {
           _port = int.tryParse(match.group(1) ?? '');
           _isRunning = true;
           _currentEnableDoh = enableDoh;
+          _currentGatewayMode = gatewayMode;
           _currentDohServer = dohServer;
+          _currentDohServerEch = dohServerEch;
           _currentPreferIPv6 = preferIPv6;
           _currentPreferredPort = preferredPort;
+          _currentServerIp = serverIp;
           _currentUpstreamSignature = _buildUpstreamSignature(
             protocol: upstreamProtocol,
             host: upstreamHost,
@@ -374,9 +425,12 @@ class DohProxyService {
     _port = null;
     _isRunning = false;
     _currentEnableDoh = null;
+    _currentGatewayMode = null;
     _currentDohServer = null;
+    _currentDohServerEch = null;
     _currentPreferIPv6 = null;
     _currentPreferredPort = null;
+    _currentServerIp = null;
     _currentUpstreamSignature = null;
     // 注意：不清除 _lastError，保留用于 UI 展示
   }
@@ -395,15 +449,27 @@ class DohProxyService {
     }
 
     // 查找可执行文件的可能位置
+    final execPath = Platform.resolvedExecutable;
     final possiblePaths = <String>[
-      // 开发时：core/doh_proxy/target/release/
-      p.join(Directory.current.path, 'core', 'doh_proxy', 'target', 'release', executableName),
-      // 开发时：core/doh_proxy/target/debug/
-      p.join(Directory.current.path, 'core', 'doh_proxy', 'target', 'debug', executableName),
       // 打包后：与应用程序同目录
-      p.join(p.dirname(Platform.resolvedExecutable), executableName),
+      p.join(p.dirname(execPath), executableName),
       // 打包后：assets 目录
-      p.join(p.dirname(Platform.resolvedExecutable), 'data', 'flutter_assets', 'assets', executableName),
+      p.join(p.dirname(execPath), 'data', 'flutter_assets', 'assets', executableName),
+      // 开发时：通过 app bundle 路径反推项目根目录
+      ...() {
+        final buildIdx = execPath.indexOf('${p.separator}build${p.separator}');
+        if (buildIdx > 0) {
+          final projectRoot = execPath.substring(0, buildIdx);
+          return [
+            p.join(projectRoot, 'core', 'doh_proxy', 'target', 'release', executableName),
+            p.join(projectRoot, 'core', 'doh_proxy', 'target', 'debug', executableName),
+          ];
+        }
+        return <String>[];
+      }(),
+      // 开发时：CWD 可能是项目根目录
+      p.join(Directory.current.path, 'core', 'doh_proxy', 'target', 'release', executableName),
+      p.join(Directory.current.path, 'core', 'doh_proxy', 'target', 'debug', executableName),
     ];
 
     for (final path in possiblePaths) {
@@ -423,6 +489,120 @@ class DohProxyService {
     return null;
   }
 
+  Future<Uint8List?> lookupEchConfig(String host, String dohServer) async {
+    if (!DohProxyFfi.isAvailable) {
+      return DohProxyFfi.instance.lookupEchConfig(host, dohServer);
+    }
+    return _enqueueFfiOp(() => _callFfiLookupEchConfig(host, dohServer));
+  }
+
+  Future<List<String>> lookupIp(
+    String host,
+    String dohServer, {
+    bool preferIpv6 = false,
+  }) async {
+    if (!DohProxyFfi.isAvailable) {
+      return DohProxyFfi.instance.lookupIp(
+            host,
+            dohServer,
+            preferIpv6: preferIpv6,
+          ) ??
+          const [];
+    }
+    return _enqueueFfiOp(
+      () => _callFfiLookupIp(
+        host,
+        dohServer,
+        preferIpv6: preferIpv6,
+      ),
+    );
+  }
+
+  Future<DohHostLookupResult?> lookupHost(
+    String host,
+    String dohServer, {
+    String? dohServerEch,
+    bool preferIpv6 = false,
+    bool forceRefresh = false,
+  }) async {
+    if (!DohProxyFfi.isAvailable) {
+      return DohProxyFfi.instance.lookupHost(
+        host,
+        dohServer,
+        dohServerEch: dohServerEch,
+        preferIpv6: preferIpv6,
+        forceRefresh: forceRefresh,
+      );
+    }
+    return _enqueueFfiOp(
+      () => _callFfiLookupHost(
+        host,
+        dohServer,
+        dohServerEch: dohServerEch,
+        preferIpv6: preferIpv6,
+        forceRefresh: forceRefresh,
+      ),
+    );
+  }
+
+  Future<bool> clearDnsCache() async {
+    if (!DohProxyFfi.isAvailable) {
+      return DohProxyFfi.instance.clearDnsCache();
+    }
+    return _enqueueFfiOp(_callFfiClearDnsCache);
+  }
+
+  Future<bool> recordHostSuccess(
+    String host,
+    String dohServer, {
+    String? dohServerEch,
+    bool preferIpv6 = false,
+    required String ip,
+  }) async {
+    if (!DohProxyFfi.isAvailable) {
+      return DohProxyFfi.instance.recordHostSuccess(
+        host,
+        dohServer,
+        dohServerEch: dohServerEch,
+        preferIpv6: preferIpv6,
+        ip: ip,
+      );
+    }
+    return _enqueueFfiOp(
+      () => _callFfiRecordHostSuccess(
+        host,
+        dohServer,
+        dohServerEch: dohServerEch,
+        preferIpv6: preferIpv6,
+        ip: ip,
+      ),
+    );
+  }
+
+  Future<bool> clearPreferredHostIp(
+    String host,
+    String dohServer, {
+    String? dohServerEch,
+    bool preferIpv6 = false,
+  }) async {
+    if (!DohProxyFfi.isAvailable) {
+      return DohProxyFfi.instance.clearPreferredHostIp(
+        host,
+        dohServer,
+        dohServerEch: dohServerEch,
+        preferIpv6: preferIpv6,
+      );
+    }
+    return _enqueueFfiOp(
+      () => _callFfiClearPreferredHostIp(
+        host,
+        dohServer,
+        dohServerEch: dohServerEch,
+        preferIpv6: preferIpv6,
+      ),
+    );
+  }
+
   Future<T> _enqueueFfiOp<T>(Future<T> Function() op) {
     final completer = Completer<T>();
     _ffiQueue = _ffiQueue.then((_) async {
@@ -439,8 +619,10 @@ class DohProxyService {
   Future<int> _callFfiStart({
     required int port,
     required bool enableDoh,
+    required bool gatewayMode,
     required bool preferIpv6,
     required String? dohServer,
+    required String? dohServerEch,
     required String? serverIp,
     required String? upstreamProtocol,
     required String? upstreamHost,
@@ -455,8 +637,10 @@ class DohProxyService {
       'cmd': 'start',
       'port': port,
       'enableDoh': enableDoh,
+      'gatewayMode': gatewayMode,
       'preferIpv6': preferIpv6,
       'dohServer': dohServer,
+      'dohServerEch': dohServerEch,
       'serverIp': serverIp,
       'upstreamProtocol': upstreamProtocol,
       'upstreamHost': upstreamHost,
@@ -507,6 +691,144 @@ class DohProxyService {
     response.close();
     if (result is Map<String, dynamic>) return result;
     return {'ok': false};
+  }
+
+  Future<Uint8List?> _callFfiLookupEchConfig(
+    String host,
+    String dohServer,
+  ) async {
+    final sendPort = await _ensureFfiIsolate();
+    final response = ReceivePort();
+    sendPort.send({
+      'cmd': 'lookup_ech',
+      'host': host,
+      'dohServer': dohServer,
+      'replyTo': response.sendPort,
+    });
+    final result = await response.first;
+    response.close();
+    if (result is Map && result['ok'] == true && result['data'] is Uint8List) {
+      return result['data'] as Uint8List;
+    }
+    return null;
+  }
+
+  Future<List<String>> _callFfiLookupIp(
+    String host,
+    String dohServer, {
+    required bool preferIpv6,
+  }) async {
+    final sendPort = await _ensureFfiIsolate();
+    final response = ReceivePort();
+    sendPort.send({
+      'cmd': 'lookup_ip',
+      'host': host,
+      'dohServer': dohServer,
+      'preferIpv6': preferIpv6,
+      'replyTo': response.sendPort,
+    });
+    final result = await response.first;
+    response.close();
+    if (result is Map && result['ok'] == true && result['data'] is List) {
+      return (result['data'] as List)
+          .map((value) => value.toString())
+          .where((value) => value.isNotEmpty)
+          .toList();
+    }
+    return const [];
+  }
+
+  Future<DohHostLookupResult?> _callFfiLookupHost(
+    String host,
+    String dohServer, {
+    required String? dohServerEch,
+    required bool preferIpv6,
+    required bool forceRefresh,
+  }) async {
+    final sendPort = await _ensureFfiIsolate();
+    final response = ReceivePort();
+    sendPort.send({
+      'cmd': 'lookup_host',
+      'host': host,
+      'dohServer': dohServer,
+      'dohServerEch': dohServerEch,
+      'preferIpv6': preferIpv6,
+      'forceRefresh': forceRefresh,
+      'replyTo': response.sendPort,
+    });
+    final result = await response.first;
+    response.close();
+    if (result is Map && result['ok'] == true && result['data'] is Map) {
+      final data = (result['data'] as Map).cast<String, dynamic>();
+      final ips = ((data['ips'] as List?) ?? const [])
+          .map((value) => value.toString())
+          .where((value) => value.isNotEmpty)
+          .toList();
+      final ttlMs = (data['ttl_ms'] as num?)?.toInt() ?? 300000;
+      return DohHostLookupResult(
+        ips: ips,
+        preferredIp: data['preferredIp']?.toString(),
+        echConfig: data['echConfig'] as Uint8List?,
+        ttl: Duration(milliseconds: ttlMs),
+      );
+    }
+    return null;
+  }
+
+  Future<bool> _callFfiClearDnsCache() async {
+    final sendPort = await _ensureFfiIsolate();
+    final response = ReceivePort();
+    sendPort.send({
+      'cmd': 'clear_dns_cache',
+      'replyTo': response.sendPort,
+    });
+    final result = await response.first;
+    response.close();
+    return result is Map && result['ok'] == true;
+  }
+
+  Future<bool> _callFfiRecordHostSuccess(
+    String host,
+    String dohServer, {
+    required String? dohServerEch,
+    required bool preferIpv6,
+    required String ip,
+  }) async {
+    final sendPort = await _ensureFfiIsolate();
+    final response = ReceivePort();
+    sendPort.send({
+      'cmd': 'record_host_success',
+      'host': host,
+      'dohServer': dohServer,
+      'dohServerEch': dohServerEch,
+      'preferIpv6': preferIpv6,
+      'ip': ip,
+      'replyTo': response.sendPort,
+    });
+    final result = await response.first;
+    response.close();
+    return result is Map && result['ok'] == true;
+  }
+
+  Future<bool> _callFfiClearPreferredHostIp(
+    String host,
+    String dohServer, {
+    required String? dohServerEch,
+    required bool preferIpv6,
+  }) async {
+    final sendPort = await _ensureFfiIsolate();
+    final response = ReceivePort();
+    sendPort.send({
+      'cmd': 'clear_preferred_host_ip',
+      'host': host,
+      'dohServer': dohServer,
+      'dohServerEch': dohServerEch,
+      'preferIpv6': preferIpv6,
+      'replyTo': response.sendPort,
+    });
+    final result = await response.first;
+    response.close();
+    return result is Map && result['ok'] == true;
   }
 
   Future<void> _ensureFfiStopped() async {
@@ -575,8 +897,10 @@ void _ffiIsolateEntry(SendPort mainSendPort) {
           final portValue = message['port'] as int? ?? 0;
           final preferredPort = message['preferredPort'] as int? ?? 0;
           final enableDoh = message['enableDoh'] as bool? ?? true;
+          final gatewayMode = message['gatewayMode'] as bool? ?? false;
           final preferIpv6 = message['preferIpv6'] as bool? ?? false;
           final dohServer = message['dohServer'] as String?;
+          final dohServerEch = message['dohServerEch'] as String?;
           final serverIp = message['serverIp'] as String?;
           final upstreamProtocol = message['upstreamProtocol'] as String?;
           final upstreamHost = message['upstreamHost'] as String?;
@@ -587,8 +911,10 @@ void _ffiIsolateEntry(SendPort mainSendPort) {
           var resultPort = DohProxyFfi.instance.start(
             port: portValue,
             enableDoh: enableDoh,
+            gatewayMode: gatewayMode,
             preferIpv6: preferIpv6,
             dohServer: dohServer,
+            dohServerEch: dohServerEch,
             serverIp: serverIp,
             upstreamProtocol: upstreamProtocol,
             upstreamHost: upstreamHost,
@@ -601,8 +927,10 @@ void _ffiIsolateEntry(SendPort mainSendPort) {
             resultPort = DohProxyFfi.instance.start(
               port: 0,
               enableDoh: enableDoh,
+              gatewayMode: gatewayMode,
               preferIpv6: preferIpv6,
               dohServer: dohServer,
+              dohServerEch: dohServerEch,
               serverIp: serverIp,
               upstreamProtocol: upstreamProtocol,
               upstreamHost: upstreamHost,
@@ -643,6 +971,81 @@ void _ffiIsolateEntry(SendPort mainSendPort) {
           final running = DohProxyFfi.instance.isRunning();
           final portValue = running ? DohProxyFfi.instance.getPort() : 0;
           replyTo.send({'ok': true, 'running': running, 'port': portValue});
+          return;
+        case 'lookup_ech':
+          final host = message['host'] as String? ?? '';
+          final dohServer = message['dohServer'] as String? ?? '';
+          final bytes = DohProxyFfi.instance.lookupEchConfig(host, dohServer);
+          replyTo.send({'ok': true, 'data': bytes});
+          return;
+        case 'lookup_ip':
+          final host = message['host'] as String? ?? '';
+          final dohServer = message['dohServer'] as String? ?? '';
+          final preferIpv6 = message['preferIpv6'] as bool? ?? false;
+          final addrs = DohProxyFfi.instance.lookupIp(
+                host,
+                dohServer,
+                preferIpv6: preferIpv6,
+              ) ??
+              const <String>[];
+          replyTo.send({'ok': true, 'data': addrs});
+          return;
+        case 'lookup_host':
+          final host = message['host'] as String? ?? '';
+          final dohServer = message['dohServer'] as String? ?? '';
+          final dohServerEch = message['dohServerEch'] as String?;
+          final preferIpv6 = message['preferIpv6'] as bool? ?? false;
+          final forceRefresh = message['forceRefresh'] as bool? ?? false;
+          final result = DohProxyFfi.instance.lookupHost(
+            host,
+            dohServer,
+            dohServerEch: dohServerEch,
+            preferIpv6: preferIpv6,
+            forceRefresh: forceRefresh,
+          );
+          replyTo.send({
+            'ok': true,
+            'data': result == null
+                ? null
+                : {
+                    'ips': result.ips,
+                    'preferredIp': result.preferredIp,
+                    'echConfig': result.echConfig,
+                    'ttl_ms': result.ttl.inMilliseconds,
+                  },
+          });
+          return;
+        case 'clear_dns_cache':
+          final ok = DohProxyFfi.instance.clearDnsCache();
+          replyTo.send({'ok': ok});
+          return;
+        case 'record_host_success':
+          final host = message['host'] as String? ?? '';
+          final dohServer = message['dohServer'] as String? ?? '';
+          final dohServerEch = message['dohServerEch'] as String?;
+          final preferIpv6 = message['preferIpv6'] as bool? ?? false;
+          final ip = message['ip'] as String? ?? '';
+          final ok = DohProxyFfi.instance.recordHostSuccess(
+            host,
+            dohServer,
+            dohServerEch: dohServerEch,
+            preferIpv6: preferIpv6,
+            ip: ip,
+          );
+          replyTo.send({'ok': ok});
+          return;
+        case 'clear_preferred_host_ip':
+          final host = message['host'] as String? ?? '';
+          final dohServer = message['dohServer'] as String? ?? '';
+          final dohServerEch = message['dohServerEch'] as String?;
+          final preferIpv6 = message['preferIpv6'] as bool? ?? false;
+          final ok = DohProxyFfi.instance.clearPreferredHostIp(
+            host,
+            dohServer,
+            dohServerEch: dohServerEch,
+            preferIpv6: preferIpv6,
+          );
+          replyTo.send({'ok': ok});
           return;
       }
       replyTo.send({'ok': false, 'error': 'unknown command'});
