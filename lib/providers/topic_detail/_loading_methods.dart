@@ -169,6 +169,11 @@ extension LoadingMethods on TopicDetailNotifier {
     final currentStream = currentDetail.postStream.stream;
     if (currentStream.contains(postId)) return; // 已在 stream 中
 
+    // 对齐 Discourse triggerNewPostsInStream：先基于旧边界判断是否已加载到底部，
+    // 再更新 stream。否则新 postId 先进入 stream 后，_hasMoreAfter 会立即变成 true，
+    // 导致“本来在底部却不自动加载新帖内容”。
+    final wasLoadedAllPosts = !_hasMoreAfter;
+
     // 将 post ID 加入 stream 并更新 postsCount（本地即时更新，无需请求）
     final newStream = [...currentStream, postId];
     state = AsyncValue.data(currentDetail.copyWith(
@@ -181,9 +186,9 @@ extension LoadingMethods on TopicDetailNotifier {
     ));
     _updateBoundaryState(currentDetail.postStream.posts, newStream);
 
-    // 对齐 Discourse loadedAllPosts：已加载到底部时才批量拉取新帖子内容，
+    // 对齐 Discourse loadedAllPosts：收到新帖前已加载到底部时才批量拉取新帖子内容，
     // 否则只更新 stream（用户滚到底部时通过 loadMore 自然加载）。
-    if (!_hasMoreAfter) {
+    if (wasLoadedAllPosts) {
       _pendingNewPostIds.add(postId);
       _loadPendingNewPosts();
     }
