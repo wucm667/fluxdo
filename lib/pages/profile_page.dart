@@ -602,21 +602,81 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   Widget _buildContentCard(ThemeData theme) {
+    final actions = [
+      (
+        icon: Icons.article_rounded,
+        iconColor: Colors.blue,
+        title: context.l10n.profile_myTopics,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const MyTopicsPage()),
+        ),
+      ),
+      (
+        icon: Icons.bookmark_rounded,
+        iconColor: Colors.orange,
+        title: context.l10n.profile_myBookmarks,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const BookmarksPage()),
+        ),
+      ),
+      (
+        icon: Icons.drafts_rounded,
+        iconColor: Colors.teal,
+        title: context.l10n.profile_myDrafts,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const DraftsPage()),
+        ),
+      ),
+      (
+        icon: Icons.history_rounded,
+        iconColor: Colors.purple,
+        title: context.l10n.profile_browsingHistory,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const BrowsingHistoryPage()),
+        ),
+      ),
+    ];
+
     return Card(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
       clipBehavior: Clip.antiAlias,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildCompactActionItem(theme, Icons.article_rounded, Colors.blue, context.l10n.profile_myTopics, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyTopicsPage()))),
-            _buildCompactActionItem(theme, Icons.bookmark_rounded, Colors.orange, context.l10n.profile_myBookmarks, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BookmarksPage()))),
-            _buildCompactActionItem(theme, Icons.drafts_rounded, Colors.teal, context.l10n.profile_myDrafts, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DraftsPage()))),
-            _buildCompactActionItem(theme, Icons.history_rounded, Colors.purple, context.l10n.profile_browsingHistory, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BrowsingHistoryPage()))),
-          ],
+        padding: const EdgeInsets.all(12),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            const spacing = 8.0;
+            final columns = constraints.maxWidth < 220
+                ? 1
+                : constraints.maxWidth < 300
+                    ? 2
+                    : 4;
+            final itemWidth =
+                (constraints.maxWidth - spacing * (columns - 1)) / columns;
+
+            return Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
+              children: [
+                for (final action in actions)
+                  SizedBox(
+                    width: itemWidth,
+                    child: _buildCompactActionItem(
+                      theme,
+                      action.icon,
+                      action.iconColor,
+                      action.title,
+                      action.onTap,
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -627,24 +687,33 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: SizedBox(
+          width: double.infinity,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: iconColor, size: 22),
               ),
-              child: Icon(icon, color: iconColor, size: 22),
-            ),
-            const SizedBox(height: 6),
-            Text(title, style: theme.textTheme.labelMedium?.copyWith(
-              fontWeight: FontWeight.w500,
-              fontSize: 12,
-            )),
-          ],
+              const SizedBox(height: 6),
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
