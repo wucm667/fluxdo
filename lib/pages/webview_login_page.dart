@@ -34,9 +34,11 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
   final _service = DiscourseService();
   final _cookieJar = CookieJarService();
   final _credentialStore = CredentialStoreService();
+  final Uri _baseUri = Uri.parse(AppConstants.baseUrl);
   InAppWebViewController? _controller;
   bool _isLoading = true;
   bool _loginHandled = false;
+  String? _lastHomeResponseUrl;
   String _url = AppConstants.baseUrl;
   double _progress = 0;
   String? _savedUsername;
@@ -174,9 +176,13 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
                 onLoadStart: (controller, url) => setState(() {
                   _isLoading = true;
                   _url = url?.toString() ?? '';
+                  _lastHomeResponseUrl = null;
                 }),
                 onProgressChanged: (controller, progress) =>
                     setState(() => _progress = progress / 100),
+                onLoadResource: (controller, resource) {
+                  _handleLoadedResource(controller, resource);
+                },
                 onLoadStop: (controller, url) async {
                   setState(() {
                     _isLoading = false;
@@ -187,13 +193,16 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
                   // 自动填充登录表单
                   await _autoFillLoginForm(controller, url);
                   // 自动检测登录状态
-                  await _checkLoginStatus(controller);
+                  await _checkLoginStatus(
+                    controller,
+                    currentUrl: url?.toString(),
+                  );
                 },
                 onUpdateVisitedHistory: (controller, url, isReload) {
                   if (!_loginHandled && isReload != true) {
                     // SPA 路由变化时也尝试检测登录状态
                     _recheckCount = 0;
-                    _checkLoginStatus(controller);
+                    _checkLoginStatus(controller, currentUrl: url?.toString());
                   }
                 },
               ),
@@ -327,15 +336,22 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
   }
 
   /// 检测登录状态，登录成功自动关闭
-  Future<void> _checkLoginStatus(InAppWebViewController controller) async {
+  Future<void> _checkLoginStatus(
+    InAppWebViewController controller, {
+    String? currentUrl,
+  }) async {
     if (_loginHandled) return;
 
     final username = await _readCurrentUsername(controller);
     if (username == null || username.isEmpty) {
+      if (_lastHomeResponseUrl != null &&
+          _isHomePageUrl(_lastHomeResponseUrl)) {
+        _scheduleLoginRecheck(controller);
+      }
       return;
     }
 
-    final currentUrl = (await controller.getUrl())?.toString();
+    currentUrl ??= (await controller.getUrl())?.toString();
     final tToken = await _readTTokenFromWebView(
       controller,
       currentUrl: currentUrl,
@@ -381,9 +397,11 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
 
       // 仅设置 token，暂不广播
       _service.setToken(effectiveToken);
-      final reusedPreloaded = await _hydratePreloadedFromPage(controller);
+      final reusedPreloaded = _canReuseHomePageData(currentUrl)
+          ? await _hydratePreloadedFromPage(controller)
+          : false;
       if (!reusedPreloaded) {
-        debugPrint('[Login] 当前页面无可复用预加载数据，回退到 HTTP refresh');
+        debugPrint('[Login] 当前页面无可复用首页数据，回退到 HTTP refresh');
         await PreloadedDataService().refresh();
       }
       // 数据就绪后再广播（触发 provider rebuild + MessageBus 初始化）
@@ -467,9 +485,13 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
     InAppWebViewController controller,
   ) async {
     try {
-      final html = await controller.evaluateJavascript(
-        source: 'document.documentElement.outerHTML',
-      );
+      final currentUrl = (await controller.getUrl())?.toString();
+      if (!_isHomePageUrl(currentUrl)) {
+        debugPrint('[Login] 当前页面不是首页，拒绝复用 WebView 页面数据: $currentUrl');
+        return false;
+      }
+
+      final html = await controller.getHtml();
       if (html == null) {
         return false;
       }
@@ -488,6 +510,28 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
       debugPrint('[Login] 复用 WebView 页面预加载数据失败: $e');
       return false;
     }
+  }
+
+  Future<void> _handleLoadedResource(
+    InAppWebViewController controller,
+    LoadedResource resource,
+  ) async {
+    final resourceUrl = resource.url?.toString();
+    if (!_isHomePageUrl(resourceUrl)) {
+      return;
+    }
+
+    _lastHomeResponseUrl = resourceUrl;
+    debugPrint(
+      '[Login] 检测到首页响应: url=$resourceUrl, initiatorType=${resource.initiatorType}',
+    );
+    await _checkLoginStatus(controller, currentUrl: resourceUrl);
+  }
+
+  bool _canReuseHomePageData(String? currentUrl) {
+    return _isHomePageUrl(currentUrl) &&
+        _lastHomeResponseUrl != null &&
+        _urlsMatchByPath(currentUrl, _lastHomeResponseUrl);
   }
 
   Future<String?> _readTTokenFromWebView(
@@ -529,5 +573,51 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
       }
       _checkLoginStatus(controller);
     });
+  }
+
+  bool _isHomePageUrl(String? rawUrl) {
+    final uri = Uri.tryParse(rawUrl ?? '');
+    if (uri == null) {
+      return false;
+    }
+    if (uri.scheme != _baseUri.scheme || uri.host != _baseUri.host) {
+      return false;
+    }
+    if (uri.hasPort != _baseUri.hasPort) {
+      return false;
+    }
+    if (uri.hasPort && uri.port != _baseUri.port) {
+      return false;
+    }
+
+    final currentPath = _normalizePath(uri.path);
+    final homePath = _normalizePath(_baseUri.path);
+    return currentPath == homePath;
+  }
+
+  bool _urlsMatchByPath(String? left, String? right) {
+    final leftUri = Uri.tryParse(left ?? '');
+    final rightUri = Uri.tryParse(right ?? '');
+    if (leftUri == null || rightUri == null) {
+      return false;
+    }
+    if (leftUri.scheme != rightUri.scheme ||
+        leftUri.host != rightUri.host ||
+        leftUri.hasPort != rightUri.hasPort) {
+      return false;
+    }
+    if (leftUri.hasPort && leftUri.port != rightUri.port) {
+      return false;
+    }
+    return _normalizePath(leftUri.path) == _normalizePath(rightUri.path);
+  }
+
+  String _normalizePath(String path) {
+    if (path.isEmpty || path == '/') {
+      return '/';
+    }
+    return path.endsWith('/') && path.length > 1
+        ? path.substring(0, path.length - 1)
+        : path;
   }
 }

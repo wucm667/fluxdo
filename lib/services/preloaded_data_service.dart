@@ -39,6 +39,7 @@ class PreloadedDataService {
   String? _cdnUrl; // CDN 域名（从 data-discourse-setup 提取）
   String? _s3CdnUrl; // S3 CDN 域名（如 https://cdn3.linux.do）
   String? _s3BaseUrl; // S3 基础 URL（如 //linuxdo-uploads.s3.linux.do）
+  bool _hasDiscourseSetup = false; // 是否提取到 data-discourse-setup 标签
   bool _loaded = false;
   bool _loading = false;
 
@@ -361,6 +362,18 @@ class PreloadedDataService {
       return false;
     }
 
+    if (!_hasReusableBootstrapData()) {
+      debugPrint(
+        '[PreloadedData] HTML 快照缺少完整引导数据: '
+        'hasSetup=$_hasDiscourseSetup, '
+        'hasCurrentUser=${_currentUser != null}, '
+        'hasSiteSettings=${_siteSettings != null}, '
+        'hasSite=${_site != null}',
+      );
+      _clearCachedData();
+      return false;
+    }
+
     _loaded = true;
     CfClearanceRefreshService().start();
     debugPrint('[PreloadedData] 已从 HTML 快照恢复数据');
@@ -385,6 +398,7 @@ class PreloadedDataService {
     _cdnUrl = null;
     _s3CdnUrl = null;
     _s3BaseUrl = null;
+    _hasDiscourseSetup = false;
   }
 
   /// 重置缓存（登出时调用）
@@ -506,6 +520,7 @@ class PreloadedDataService {
       caseSensitive: false,
     ).firstMatch(html);
     if (tagMatch == null) return;
+    _hasDiscourseSetup = true;
     final tag = tagMatch.group(0)!;
 
     String? extractAttr(String attrName) {
@@ -528,6 +543,13 @@ class PreloadedDataService {
         '[PreloadedData] s3CdnUrl: $_s3CdnUrl, s3BaseUrl: $_s3BaseUrl',
       );
     }
+  }
+
+  bool _hasReusableBootstrapData() {
+    return _hasDiscourseSetup &&
+        _currentUser != null &&
+        _siteSettings != null &&
+        _site != null;
   }
 
   /// 从 HTML 中提取 discourse-base-uri（子路径部署前缀）
