@@ -153,6 +153,7 @@ class CookieJarService {
   Future<void> syncFromWebView({
     String? currentUrl,
     InAppWebViewController? controller,
+    Set<String>? cookieNames,
   }) async {
     if (!_initialized) await initialize();
 
@@ -176,6 +177,7 @@ class CookieJarService {
           baseUri: baseUri,
           currentUrl: currentUrl,
           extraHosts: extraHosts,
+          cookieNames: cookieNames,
         );
         return;
       }
@@ -217,6 +219,9 @@ class CookieJarService {
 
       for (final snapshot in webViewCookies.values) {
         final wc = snapshot.cookie;
+        if (cookieNames != null && !cookieNames.contains(wc.name)) {
+          continue;
+        }
         final rawDomain = wc.domain?.trim();
         final normalizedDomain = _normalizeWebViewCookieDomain(rawDomain);
         final shouldPersistAsDomainCookie = _shouldPersistWebViewDomainCookie(
@@ -541,18 +546,25 @@ class CookieJarService {
     try {
       final uri = Uri.parse(AppConstants.baseUrl);
       final extraHosts = <String>{};
-      final currentHost = Uri.tryParse(currentUrl ?? '')?.host.trim().toLowerCase();
+      final currentHost = Uri.tryParse(
+        currentUrl ?? '',
+      )?.host.trim().toLowerCase();
       if (currentHost != null &&
           currentHost.isNotEmpty &&
           (currentHost == uri.host || currentHost.endsWith('.${uri.host}'))) {
         extraHosts.add(currentHost);
       }
 
-      final relatedHosts = await _getRelatedHosts(uri.host, extraHosts: extraHosts);
+      final relatedHosts = await _getRelatedHosts(
+        uri.host,
+        extraHosts: extraHosts,
+      );
       // 按 name|path 去重：同名 cookie 只保留一份，优先 domain 版本
       final bestCookies = <String, (io.Cookie, String)>{};
       for (final host in relatedHosts) {
-        final hostCookies = await _cookieJar!.loadForRequest(Uri.parse('https://$host'));
+        final hostCookies = await _cookieJar!.loadForRequest(
+          Uri.parse('https://$host'),
+        );
         for (final c in hostCookies) {
           final key = '${c.name}|${c.path ?? "/"}';
           final existing = bestCookies[key];
@@ -608,11 +620,15 @@ class CookieJarService {
           );
           written++;
         } catch (e) {
-          debugPrint('[CookieJar][Windows] CDP setCookie failed: ${cookie.name}, $e');
+          debugPrint(
+            '[CookieJar][Windows] CDP setCookie failed: ${cookie.name}, $e',
+          );
         }
       }
 
-      debugPrint('[CookieJar][Windows] syncToWebViewViaController: $written/${cookies.length} cookies');
+      debugPrint(
+        '[CookieJar][Windows] syncToWebViewViaController: $written/${cookies.length} cookies',
+      );
     } catch (e) {
       debugPrint('[CookieJar][Windows] syncToWebViewViaController failed: $e');
     }
@@ -626,6 +642,7 @@ class CookieJarService {
     required Uri baseUri,
     String? currentUrl,
     Set<String> extraHosts = const {},
+    Set<String>? cookieNames,
   }) async {
     final resolvedCurrentUrl =
         currentUrl ?? (await controller.getUrl())?.toString();
@@ -650,7 +667,9 @@ class CookieJarService {
           ? result['cookies']
           : null;
       if (rawCookies is! List || rawCookies.isEmpty) {
-        debugPrint('[CookieJar][Windows] syncFromWebView(controller): no cookies');
+        debugPrint(
+          '[CookieJar][Windows] syncFromWebView(controller): no cookies',
+        );
         return;
       }
 
@@ -684,6 +703,9 @@ class CookieJarService {
       final bucketedCookies = <Uri, Map<String, io.Cookie>>{};
       for (final raw in bestCookies.values) {
         final name = raw['name'].toString();
+        if (cookieNames != null && !cookieNames.contains(name)) {
+          continue;
+        }
         final value = raw['value']?.toString() ?? '';
         final rawDomain = raw['domain']?.toString().trim();
         final isDomainCookie = rawDomain != null && rawDomain.startsWith('.');
@@ -713,7 +735,8 @@ class CookieJarService {
           );
         }
 
-        if (cookie.expires != null && cookie.expires!.isBefore(DateTime.now())) {
+        if (cookie.expires != null &&
+            cookie.expires!.isBefore(DateTime.now())) {
           continue;
         }
         if (cookie.value.isEmpty && _isCriticalCookie(cookie.name)) {
@@ -722,10 +745,12 @@ class CookieJarService {
 
         final hostForUri = normalizedDomain ?? baseUri.host;
         final bucketUri = Uri(scheme: baseUri.scheme, host: hostForUri);
-        final dedupeKey = '${cookie.name}|${cookie.path}|${cookie.domain ?? hostForUri}';
-        bucketedCookies
-            .putIfAbsent(bucketUri, () => <String, io.Cookie>{})
-            [dedupeKey] = cookie;
+        final dedupeKey =
+            '${cookie.name}|${cookie.path}|${cookie.domain ?? hostForUri}';
+        bucketedCookies.putIfAbsent(
+          bucketUri,
+          () => <String, io.Cookie>{},
+        )[dedupeKey] = cookie;
       }
 
       // 先清掉关键 cookie 旧值

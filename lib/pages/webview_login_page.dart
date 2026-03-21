@@ -44,8 +44,7 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
   @override
   void initState() {
     super.initState();
-    _cookieJar.syncToWebView(
-    );
+    _cookieJar.syncToWebView();
     _loadSavedUsername();
   }
 
@@ -136,67 +135,70 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
             ),
           ),
           Expanded(
-            child: WebViewSettings.wrapWithScrollFix(InAppWebView(
-              webViewEnvironment:
-                  WindowsWebViewEnvironmentService.instance.environment,
-              initialUrlRequest: URLRequest(
-                url: WebUri(
-                  widget.initialUrl ?? '${AppConstants.baseUrl}/login',
+            child: WebViewSettings.wrapWithScrollFix(
+              InAppWebView(
+                webViewEnvironment:
+                    WindowsWebViewEnvironmentService.instance.environment,
+                initialUrlRequest: URLRequest(
+                  url: WebUri(
+                    widget.initialUrl ?? '${AppConstants.baseUrl}/login',
+                  ),
                 ),
-              ),
-              initialSettings: WebViewSettings.visible,
-              onWebViewCreated: (controller) {
-                _controller = controller;
-                // 注册 JS Handler，用于在登录按钮点击时接收凭证
-                controller.addJavaScriptHandler(
-                  handlerName: 'onLoginCredentials',
-                  callback: (args) {
-                    if (args.isNotEmpty &&
-                        ref.read(preferencesProvider).autoFillLogin) {
-                      try {
-                        final data = args[0] as Map<String, dynamic>;
-                        final username = data['username'] as String?;
-                        final password = data['password'] as String?;
-                        if (username != null &&
-                            username.isNotEmpty &&
-                            password != null &&
-                            password.isNotEmpty) {
-                          _credentialStore.save(username, password);
-                          if (mounted) {
-                            setState(() => _savedUsername = username);
+                initialSettings: WebViewSettings.visible,
+                onWebViewCreated: (controller) {
+                  _controller = controller;
+                  // 注册 JS Handler，用于在登录按钮点击时接收凭证
+                  controller.addJavaScriptHandler(
+                    handlerName: 'onLoginCredentials',
+                    callback: (args) {
+                      if (args.isNotEmpty &&
+                          ref.read(preferencesProvider).autoFillLogin) {
+                        try {
+                          final data = args[0] as Map<String, dynamic>;
+                          final username = data['username'] as String?;
+                          final password = data['password'] as String?;
+                          if (username != null &&
+                              username.isNotEmpty &&
+                              password != null &&
+                              password.isNotEmpty) {
+                            _credentialStore.save(username, password);
+                            if (mounted) {
+                              setState(() => _savedUsername = username);
+                            }
                           }
-                        }
-                      } catch (_) {}
-                    }
-                  },
-                );
-              },
-              onLoadStart: (controller, url) => setState(() {
-                _isLoading = true;
-                _url = url?.toString() ?? '';
-              }),
-              onProgressChanged: (controller, progress) =>
-                  setState(() => _progress = progress / 100),
-              onLoadStop: (controller, url) async {
-                setState(() {
-                  _isLoading = false;
+                        } catch (_) {}
+                      }
+                    },
+                  );
+                },
+                onLoadStart: (controller, url) => setState(() {
+                  _isLoading = true;
                   _url = url?.toString() ?? '';
-                });
-                _recheckCount = 0;
-                await WebViewSettings.injectScrollFix(controller);
-                // 自动填充登录表单
-                await _autoFillLoginForm(controller, url);
-                // 自动检测登录状态
-                await _checkLoginStatus(controller);
-              },
-              onUpdateVisitedHistory: (controller, url, isReload) {
-                if (!_loginHandled && isReload != true) {
-                  // SPA 路由变化时也尝试检测登录状态
+                }),
+                onProgressChanged: (controller, progress) =>
+                    setState(() => _progress = progress / 100),
+                onLoadStop: (controller, url) async {
+                  setState(() {
+                    _isLoading = false;
+                    _url = url?.toString() ?? '';
+                  });
                   _recheckCount = 0;
-                  _checkLoginStatus(controller);
-                }
-              },
-            ), getController: () => _controller),
+                  await WebViewSettings.injectScrollFix(controller);
+                  // 自动填充登录表单
+                  await _autoFillLoginForm(controller, url);
+                  // 自动检测登录状态
+                  await _checkLoginStatus(controller);
+                },
+                onUpdateVisitedHistory: (controller, url, isReload) {
+                  if (!_loginHandled && isReload != true) {
+                    // SPA 路由变化时也尝试检测登录状态
+                    _recheckCount = 0;
+                    _checkLoginStatus(controller);
+                  }
+                },
+              ),
+              getController: () => _controller,
+            ),
           ),
         ],
       ),
@@ -379,8 +381,11 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
 
       // 仅设置 token，暂不广播
       _service.setToken(effectiveToken);
-      // 先刷新预加载数据（确保 longPollingBaseUrl 等就绪）
-      await PreloadedDataService().refresh();
+      final reusedPreloaded = await _hydratePreloadedFromPage(controller);
+      if (!reusedPreloaded) {
+        debugPrint('[Login] 当前页面无可复用预加载数据，回退到 HTTP refresh');
+        await PreloadedDataService().refresh();
+      }
       // 数据就绪后再广播（触发 provider rebuild + MessageBus 初始化）
       _service.onLoginSuccess(effectiveToken);
 
@@ -456,6 +461,33 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
         CookieSyncService().setCsrfToken(csrf.toString());
       }
     } catch (_) {}
+  }
+
+  Future<bool> _hydratePreloadedFromPage(
+    InAppWebViewController controller,
+  ) async {
+    try {
+      final html = await controller.evaluateJavascript(
+        source: 'document.documentElement.outerHTML',
+      );
+      if (html == null) {
+        return false;
+      }
+
+      final htmlText = html.toString();
+      if (htmlText.isEmpty || htmlText == 'null') {
+        return false;
+      }
+
+      final hydrated = await PreloadedDataService().hydrateFromHtml(htmlText);
+      if (hydrated) {
+        debugPrint('[Login] 已直接复用 WebView 页面预加载数据');
+      }
+      return hydrated;
+    } catch (e) {
+      debugPrint('[Login] 复用 WebView 页面预加载数据失败: $e');
+      return false;
+    }
   }
 
   Future<String?> _readTTokenFromWebView(

@@ -8,16 +8,14 @@ import '../models/topic.dart';
 import '../models/category.dart';
 import 'network/discourse_dio.dart';
 import 'network/cookie/cookie_sync_service.dart';
-import 'network/cookie/cookie_jar_service.dart';
 import 'cf_challenge_service.dart';
-import 'auth_log_service.dart';
-import 'auth_verify_service.dart';
 import 'cf_clearance_refresh_service.dart';
 
 /// 预加载数据服务
 /// 从首页 HTML 的 data-preloaded 属性中提取数据，避免额外 API 请求
 class PreloadedDataService {
-  static final PreloadedDataService _instance = PreloadedDataService._internal();
+  static final PreloadedDataService _instance =
+      PreloadedDataService._internal();
   factory PreloadedDataService() => _instance;
 
   final Dio _dio;
@@ -27,44 +25,38 @@ class PreloadedDataService {
   // 缓存的预加载数据
   Map<String, dynamic>? _currentUser;
   Map<String, dynamic>? _siteSettings;
-  Map<String, dynamic>? _site;           // 站点信息（包含 categories）
+  Map<String, dynamic>? _site; // 站点信息（包含 categories）
   Map<String, dynamic>? _topicTrackingStateMeta;
-  Map<String, dynamic>? _topicListData;  // 首页话题列表原始数据
-  TopicListResponse? _cachedTopicListResponse;  // 缓存的已解析话题列表
+  Map<String, dynamic>? _topicListData; // 首页话题列表原始数据
+  TopicListResponse? _cachedTopicListResponse; // 缓存的已解析话题列表
   Completer<TopicListResponse?>? _topicListResponseCompleter;
-  List<Map<String, dynamic>>? _customEmoji;  // 自定义 emoji
-  List<Map<String, dynamic>>? _topicTrackingStates;  // 话题追踪状态
+  List<Map<String, dynamic>>? _customEmoji; // 自定义 emoji
+  List<Map<String, dynamic>>? _topicTrackingStates; // 话题追踪状态
   List<String>? _enabledReactions;
-  String? _sharedSessionKey;  // MessageBus 跨域认证 key
-  String? _longPollingBaseUrl;  // MessageBus 独立域名
-  String _baseUri = '';  // Discourse 子路径前缀（如 /forum）
-  String? _cdnUrl;  // CDN 域名（从 data-discourse-setup 提取）
-  String? _s3CdnUrl;  // S3 CDN 域名（如 https://cdn3.linux.do）
-  String? _s3BaseUrl;  // S3 基础 URL（如 //linuxdo-uploads.s3.linux.do）
+  String? _sharedSessionKey; // MessageBus 跨域认证 key
+  String? _longPollingBaseUrl; // MessageBus 独立域名
+  String _baseUri = ''; // Discourse 子路径前缀（如 /forum）
+  String? _cdnUrl; // CDN 域名（从 data-discourse-setup 提取）
+  String? _s3CdnUrl; // S3 CDN 域名（如 https://cdn3.linux.do）
+  String? _s3BaseUrl; // S3 基础 URL（如 //linuxdo-uploads.s3.linux.do）
   bool _loaded = false;
   bool _loading = false;
 
-  // 登录失效回调
-  void Function()? _onAuthInvalidCallback;
-
   PreloadedDataService._internal()
-      : _dio = DiscourseDio.create(
-          defaultHeaders: {
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-          },
-        );
+    : _dio = DiscourseDio.create(
+        defaultHeaders: {
+          'Accept':
+              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        },
+      );
 
   /// 是否已加载数据
   bool get isLoaded => _loaded;
   Map<String, dynamic>? get currentUserSync => _currentUser;
   Map<String, dynamic>? get siteSettingsSync => _siteSettings;
-  List<Map<String, dynamic>>? get topicTrackingStatesSync => _topicTrackingStates;
-
-  /// 设置登录失效回调
-  void setAuthInvalidCallback(void Function() callback) {
-    _onAuthInvalidCallback = callback;
-  }
+  List<Map<String, dynamic>>? get topicTrackingStatesSync =>
+      _topicTrackingStates;
 
   /// 设置导航 context（用于弹出 CF 验证页面）
   void setNavigatorContext(BuildContext context) {
@@ -108,7 +100,13 @@ class PreloadedDataService {
       final categoriesJson = _site!['categories'] as List?;
       if (categoriesJson != null) {
         return categoriesJson
-            .map((c) => int.tryParse((c as Map<String, dynamic>)['id']?.toString() ?? '0') ?? 0)
+            .map(
+              (c) =>
+                  int.tryParse(
+                    (c as Map<String, dynamic>)['id']?.toString() ?? '0',
+                  ) ??
+                  0,
+            )
             .where((id) => id != 0)
             .toSet();
       }
@@ -142,12 +140,15 @@ class PreloadedDataService {
     final topTags = _site!['top_tags'] as List?;
     if (topTags != null) {
       // 兼容新旧格式：如果是对象则取 name 字段，如果是字符串则直接用
-      return topTags.map((t) {
-        if (t is Map<String, dynamic>) {
-          return t['name'] as String? ?? '';
-        }
-        return t.toString();
-      }).where((name) => name.isNotEmpty).toList();
+      return topTags
+          .map((t) {
+            if (t is Map<String, dynamic>) {
+              return t['name'] as String? ?? '';
+            }
+            return t.toString();
+          })
+          .where((name) => name.isNotEmpty)
+          .toList();
     }
     return null;
   }
@@ -301,10 +302,13 @@ class PreloadedDataService {
       _topicListResponseCompleter = null;
       return response;
     }
-    if (_topicListData == null && _topicListResponseCompleter == null) return null;
+    if (_topicListData == null && _topicListResponseCompleter == null) {
+      return null;
+    }
 
     try {
-      if (_cachedTopicListResponse == null && _topicListResponseCompleter != null) {
+      if (_cachedTopicListResponse == null &&
+          _topicListResponseCompleter != null) {
         await _topicListResponseCompleter!.future;
       }
       if (_cachedTopicListResponse == null) return null;
@@ -333,7 +337,7 @@ class PreloadedDataService {
   TopicListResponse? getInitialTopicListSync() {
     if (_cachedTopicListResponse == null) return null;
     final response = _cachedTopicListResponse;
-    _cachedTopicListResponse = null;  // 消费后清除
+    _cachedTopicListResponse = null; // 消费后清除
     _topicListData = null;
     _topicListResponseCompleter = null;
     return response;
@@ -341,6 +345,29 @@ class PreloadedDataService {
 
   /// 强制刷新预加载数据
   Future<void> refresh() async {
+    _clearCachedData();
+    await _loadPreloadedData();
+  }
+
+  /// 直接从已有 HTML 快照恢复预加载数据。
+  ///
+  /// 适用于登录 WebView 已经拿到完整页面的场景，避免重复请求首页。
+  /// 返回是否成功解析到 data-preloaded。
+  Future<bool> hydrateFromHtml(String html) async {
+    _clearCachedData();
+    final parsed = await _parsePreloadedDataFromHtml(html);
+    if (!parsed) {
+      debugPrint('[PreloadedData] HTML 快照不包含可用的 data-preloaded');
+      return false;
+    }
+
+    _loaded = true;
+    CfClearanceRefreshService().start();
+    debugPrint('[PreloadedData] 已从 HTML 快照恢复数据');
+    return true;
+  }
+
+  void _clearCachedData() {
     _loaded = false;
     _currentUser = null;
     _siteSettings = null;
@@ -358,28 +385,11 @@ class PreloadedDataService {
     _cdnUrl = null;
     _s3CdnUrl = null;
     _s3BaseUrl = null;
-    await _loadPreloadedData();
   }
 
   /// 重置缓存（登出时调用）
   void reset() {
-    _loaded = false;
-    _currentUser = null;
-    _siteSettings = null;
-    _site = null;
-    _topicListData = null;
-    _cachedTopicListResponse = null;
-    _topicListResponseCompleter = null;
-    _customEmoji = null;
-    _topicTrackingStates = null;
-    _topicTrackingStateMeta = null;
-    _enabledReactions = null;
-    _sharedSessionKey = null;
-    _longPollingBaseUrl = null;
-    _baseUri = '';
-    _cdnUrl = null;
-    _s3CdnUrl = null;
-    _s3BaseUrl = null;
+    _clearCachedData();
   }
 
   /// 确保数据已加载
@@ -407,9 +417,7 @@ class PreloadedDataService {
         AppConstants.baseUrl,
         options: Options(
           headers: {'Accept': 'text/html'},
-          extra: {
-            if (AppConstants.skipCsrfForHomeRequest) 'skipCsrf': true,
-          },
+          extra: {if (AppConstants.skipCsrfForHomeRequest) 'skipCsrf': true},
         ),
       );
 
@@ -428,7 +436,7 @@ class PreloadedDataService {
   }
 
   /// 从 HTML 中解析 data-preloaded 属性
-  Future<void> _parsePreloadedDataFromHtml(String html) async {
+  Future<bool> _parsePreloadedDataFromHtml(String html) async {
     _extractCsrfTokenFromHtml(html);
     _extractSharedSessionKeyFromHtml(html);
     _extractTurnstileSitekeyFromHtml(html);
@@ -438,11 +446,11 @@ class PreloadedDataService {
     final match = RegExp(r'data-preloaded="([^"]*)"').firstMatch(html);
     if (match == null) {
       debugPrint('[PreloadedData] 未找到 data-preloaded 属性');
-      return;
+      return false;
     }
 
     // HTML entity 解码已移入 Isolate 中统一处理
-    await _parsePreloadedDataString(match.group(1)!);
+    return _parsePreloadedDataString(match.group(1)!);
   }
 
   void _extractCsrfTokenFromHtml(String html) {
@@ -512,8 +520,14 @@ class PreloadedDataService {
     _s3CdnUrl = extractAttr('s3-cdn');
     _s3BaseUrl = extractAttr('s3-base-url');
 
-    if (_cdnUrl != null) debugPrint('[PreloadedData] cdnUrl: $_cdnUrl');
-    if (_s3CdnUrl != null) debugPrint('[PreloadedData] s3CdnUrl: $_s3CdnUrl, s3BaseUrl: $_s3BaseUrl');
+    if (_cdnUrl != null) {
+      debugPrint('[PreloadedData] cdnUrl: $_cdnUrl');
+    }
+    if (_s3CdnUrl != null) {
+      debugPrint(
+        '[PreloadedData] s3CdnUrl: $_s3CdnUrl, s3BaseUrl: $_s3BaseUrl',
+      );
+    }
   }
 
   /// 从 HTML 中提取 discourse-base-uri（子路径部署前缀）
@@ -537,24 +551,26 @@ class PreloadedDataService {
   }
 
   /// 解析预加载数据字符串
-  Future<void> _parsePreloadedDataString(String dataString) async {
+  Future<bool> _parsePreloadedDataString(String dataString) async {
     try {
       // 在 Isolate 中完成 HTML entity 解码 + 外层/内层 JSON 解码
-      final preloaded = await compute(_decodePreloadedJsonInIsolate, dataString);
+      final preloaded = await compute(
+        _decodePreloadedJsonInIsolate,
+        dataString,
+      );
       if (preloaded == null) {
         debugPrint('[PreloadedData] 预加载 JSON 解析为空');
-        return;
+        return false;
       }
 
       // 解析 currentUser（已在 Isolate 中完成 jsonDecode）
       if (preloaded.containsKey('currentUser')) {
         _currentUser = preloaded['currentUser'] as Map<String, dynamic>;
-        debugPrint('[PreloadedData] currentUser 解析成功: id=${_currentUser?['id']}, '
-            'unread_notifications=${_currentUser?['unread_notifications']}, '
-            'all_unread=${_currentUser?['all_unread_notifications_count']}');
-      } else {
-        // 检查登录失效：有 token 但没有 currentUser
-        _checkAuthInvalid();
+        debugPrint(
+          '[PreloadedData] currentUser 解析成功: id=${_currentUser?['id']}, '
+          'unread_notifications=${_currentUser?['unread_notifications']}, '
+          'all_unread=${_currentUser?['all_unread_notifications_count']}',
+        );
       }
 
       // 解析 siteSettings
@@ -562,7 +578,8 @@ class PreloadedDataService {
         _siteSettings = preloaded['siteSettings'] as Map<String, dynamic>;
 
         // 提取 reactions 配置
-        final reactionsStr = _siteSettings?['discourse_reactions_enabled_reactions'] as String?;
+        final reactionsStr =
+            _siteSettings?['discourse_reactions_enabled_reactions'] as String?;
         if (reactionsStr != null && reactionsStr.isNotEmpty) {
           _enabledReactions = reactionsStr.split('|');
           debugPrint('[PreloadedData] reactions: $_enabledReactions');
@@ -574,40 +591,54 @@ class PreloadedDataService {
           _longPollingBaseUrl = pollingUrl.endsWith('/')
               ? pollingUrl.substring(0, pollingUrl.length - 1)
               : pollingUrl;
-          debugPrint('[PreloadedData] longPollingBaseUrl: $_longPollingBaseUrl');
+          debugPrint(
+            '[PreloadedData] longPollingBaseUrl: $_longPollingBaseUrl',
+          );
         }
       }
 
       // 解析 site（包含 categories、top_tags 等）
       if (preloaded.containsKey('site')) {
         _site = preloaded['site'] as Map<String, dynamic>;
-        debugPrint('[PreloadedData] site 解析成功, categories=${(_site?['categories'] as List?)?.length ?? 0}');
+        debugPrint(
+          '[PreloadedData] site 解析成功, categories=${(_site?['categories'] as List?)?.length ?? 0}',
+        );
       }
 
       // 解析 topicTrackingStateMeta（MessageBus 频道初始 ID）
       if (preloaded.containsKey('topicTrackingStateMeta')) {
-        _topicTrackingStateMeta = preloaded['topicTrackingStateMeta'] as Map<String, dynamic>;
-        debugPrint('[PreloadedData] topicTrackingStateMeta: $_topicTrackingStateMeta');
+        _topicTrackingStateMeta =
+            preloaded['topicTrackingStateMeta'] as Map<String, dynamic>;
+        debugPrint(
+          '[PreloadedData] topicTrackingStateMeta: $_topicTrackingStateMeta',
+        );
       }
 
       // 解析 topicTrackingStates（话题追踪状态）
       if (preloaded.containsKey('topicTrackingStates')) {
-        _topicTrackingStates = (preloaded['topicTrackingStates'] as List).cast<Map<String, dynamic>>();
-        debugPrint('[PreloadedData] topicTrackingStates: ${_topicTrackingStates?.length ?? 0} items');
+        _topicTrackingStates = (preloaded['topicTrackingStates'] as List)
+            .cast<Map<String, dynamic>>();
+        debugPrint(
+          '[PreloadedData] topicTrackingStates: ${_topicTrackingStates?.length ?? 0} items',
+        );
       }
 
       // 解析 customEmoji（自定义 emoji）
       if (preloaded.containsKey('customEmoji')) {
-        _customEmoji = (preloaded['customEmoji'] as List).cast<Map<String, dynamic>>();
-        debugPrint('[PreloadedData] customEmoji: ${_customEmoji?.length ?? 0} items');
+        _customEmoji = (preloaded['customEmoji'] as List)
+            .cast<Map<String, dynamic>>();
+        debugPrint(
+          '[PreloadedData] customEmoji: ${_customEmoji?.length ?? 0} items',
+        );
       }
 
       // 解析首页话题列表（如果存在）
       // 注意：这个数据可能在不同的 key 下，需要检查多个位置
       _parseTopicListFromPreloaded(preloaded);
-
+      return true;
     } catch (e) {
       debugPrint('[PreloadedData] JSON 解析失败: $e');
+      return false;
     }
   }
 
@@ -628,9 +659,13 @@ class PreloadedDataService {
           }
 
           if (_topicListData != null) {
-            final topicsCount = (_topicListData?['topic_list']?['topics'] as List?)?.length ??
-                               (_topicListData?['topics'] as List?)?.length ?? 0;
-            debugPrint('[PreloadedData] topic_list 解析成功 (key=$key), topics=$topicsCount');
+            final topicsCount =
+                (_topicListData?['topic_list']?['topics'] as List?)?.length ??
+                (_topicListData?['topics'] as List?)?.length ??
+                0;
+            debugPrint(
+              '[PreloadedData] topic_list 解析成功 (key=$key), topics=$topicsCount',
+            );
             _parseTopicListResponseAsync(_topicListData!);
             return;
           }
@@ -641,69 +676,42 @@ class PreloadedDataService {
     }
   }
 
-  /// 检查登录失效：有 token 但没有 currentUser
-  void _checkAuthInvalid() async {
-    try {
-      final tToken = await CookieJarService().getTToken();
-      if (tToken != null && tToken.isNotEmpty) {
-        debugPrint('[PreloadedData] 检测到登录失效：有 token 但没有 currentUser');
-
-        // 记录日志
-        await AuthLogService().logAuthInvalid(
-          source: 'preloaded_data',
-          reason: '有 token 但没有 currentUser',
-        );
-
-        // WebView 二次验证
-        final verifyResult = await AuthVerifyService().verifyLoginStatus();
-        if (verifyResult == true) {
-          debugPrint('[PreloadedData] WebView 验证成功，恢复登录');
-          await refresh(); // 重新加载预加载数据
-          return;
-        }
-
-        // 只有明确返回 false（确认未登录）才触发登出
-        // null 表示验证被跳过（冷却期/超时/错误），不应视为登出
-        if (verifyResult == false) {
-          _onAuthInvalidCallback?.call();
-        } else {
-          debugPrint('[PreloadedData] WebView 验证被跳过，暂不处理');
-        }
-      }
-    } catch (e) {
-      debugPrint('[PreloadedData] 检查登录失效失败: $e');
-    }
-  }
-
   void _decodeTopicListAsync(String rawJson) {
     _topicListResponseCompleter ??= Completer<TopicListResponse?>();
-    compute(_decodeTopicListInIsolate, rawJson).then((decoded) {
-      if (decoded == null) {
-        _topicListResponseCompleter?.complete(null);
-        return;
-      }
-      _topicListData = decoded;
-      final topicsCount = (_topicListData?['topic_list']?['topics'] as List?)?.length ??
-          (_topicListData?['topics'] as List?)?.length ??
-          0;
-      debugPrint('[PreloadedData] topic_list 解析成功 (async), topics=$topicsCount');
-      _parseTopicListResponseAsync(decoded);
-    }).catchError((e) {
-      debugPrint('[PreloadedData] 异步解析 topic_list 失败: $e');
-      _topicListResponseCompleter?.complete(null);
-    });
+    compute(_decodeTopicListInIsolate, rawJson)
+        .then((decoded) {
+          if (decoded == null) {
+            _topicListResponseCompleter?.complete(null);
+            return;
+          }
+          _topicListData = decoded;
+          final topicsCount =
+              (_topicListData?['topic_list']?['topics'] as List?)?.length ??
+              (_topicListData?['topics'] as List?)?.length ??
+              0;
+          debugPrint(
+            '[PreloadedData] topic_list 解析成功 (async), topics=$topicsCount',
+          );
+          _parseTopicListResponseAsync(decoded);
+        })
+        .catchError((e) {
+          debugPrint('[PreloadedData] 异步解析 topic_list 失败: $e');
+          _topicListResponseCompleter?.complete(null);
+        });
   }
 
   void _parseTopicListResponseAsync(Map<String, dynamic> data) {
     _topicListResponseCompleter ??= Completer<TopicListResponse?>();
-    compute(_parseTopicListInIsolate, data).then((result) {
-      _cachedTopicListResponse = result;
-      debugPrint('[PreloadedData] TopicListResponse 异步缓存成功');
-      _topicListResponseCompleter?.complete(result);
-    }).catchError((e) {
-      debugPrint('[PreloadedData] 异步解析 TopicListResponse 失败: $e');
-      _topicListResponseCompleter?.complete(null);
-    });
+    compute(_parseTopicListInIsolate, data)
+        .then((result) {
+          _cachedTopicListResponse = result;
+          debugPrint('[PreloadedData] TopicListResponse 异步缓存成功');
+          _topicListResponseCompleter?.complete(result);
+        })
+        .catchError((e) {
+          debugPrint('[PreloadedData] 异步解析 TopicListResponse 失败: $e');
+          _topicListResponseCompleter?.complete(null);
+        });
   }
 }
 

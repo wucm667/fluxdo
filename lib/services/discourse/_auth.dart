@@ -7,124 +7,143 @@ mixin _AuthMixin on _DiscourseServiceBase {
 
   /// 初始化拦截器
   void _initInterceptors() {
-    // 设置 PreloadedDataService 的登录失效回调
-    PreloadedDataService().setAuthInvalidCallback(() {
-      _handleAuthInvalid(
-        S.current.auth_loginExpiredRelogin,
-        source: 'preloaded_data',
-        triggerInfo: '有 token 但没有 currentUser，WebView 验证确认已登出',
-      );
-    });
-
     // 添加业务特定拦截器
-    _dio.interceptors.insert(0, InterceptorsWrapper(
-      onRequest: (options, handler) async {
-        if (!_credentialsLoaded) {
-          await _loadStoredCredentials();
-          _credentialsLoaded = true;
-        }
-
-        if (_tToken != null && _tToken!.isNotEmpty) {
-          options.headers['Discourse-Logged-In'] = 'true';
-          options.headers['Discourse-Present'] = 'true';
-        }
-
-        debugPrint('[DIO] ${options.method} ${options.uri}');
-        handler.next(options);
-      },
-      onResponse: (response, handler) async {
-        final skipAuthCheck = response.requestOptions.extra['skipAuthCheck'] == true;
-
-        final loggedOut = response.headers.value('discourse-logged-out');
-        if (!skipAuthCheck && loggedOut != null && loggedOut.isNotEmpty && !_isLoggingOut) {
-          await _onDiscourseLoggedOut(
-            source: 'response_header',
-            triggerInfo: '${response.requestOptions.method} ${response.requestOptions.uri} → ${response.statusCode}',
-            requestOptions: response.requestOptions,
-            statusCode: response.statusCode,
-            responseHeaders: response.headers.map,
-          );
-          return handler.next(response);
-        }
-
-        final tToken = await _cookieJar.getTToken();
-        if (tToken != null && tToken.isNotEmpty) {
-          _tToken = tToken;
-        }
-
-        final username = response.headers.value('x-discourse-username');
-        if (username != null && username.isNotEmpty && username != _username) {
-          _username = username;
-          _storage.write(key: DiscourseService._usernameKey, value: username);
-        }
-
-        debugPrint('[DIO] ${response.statusCode} ${response.requestOptions.uri}');
-        handler.next(response);
-      },
-      onError: (error, handler) async {
-        final skipAuthCheck = error.requestOptions.extra['skipAuthCheck'] == true;
-        final data = error.response?.data;
-        debugPrint('[DIO] Error: ${error.response?.statusCode}');
-
-        // BAD CSRF 处理：清空 token → 刷新 → 重试原请求
-        // 用 extra 标记防止无限循环，只重试一次
-        if (error.response?.statusCode == 403 &&
-            _isBadCsrfResponse(data) &&
-            error.requestOptions.extra['_csrfRetried'] != true) {
-          debugPrint('[DIO] BAD CSRF detected, refreshing csrfToken and retrying');
-          _cookieSync.clearCsrfToken();
-          await _cookieSync.updateCsrfToken();
-          // 用新 token 重试原请求
-          final options = error.requestOptions;
-          options.extra['_csrfRetried'] = true;
-          final csrf = _cookieSync.csrfToken;
-          options.headers['X-CSRF-Token'] = (csrf == null || csrf.isEmpty) ? 'undefined' : csrf;
-          try {
-            final response = await _dio.fetch(options);
-            return handler.resolve(response);
-          } on DioException catch (e) {
-            return handler.next(e);
+    _dio.interceptors.insert(
+      0,
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          if (!_credentialsLoaded) {
+            await _loadStoredCredentials();
+            _credentialsLoaded = true;
           }
-        }
 
-        final loggedOut = error.response?.headers.value('discourse-logged-out');
-        if (!skipAuthCheck && loggedOut != null && loggedOut.isNotEmpty && !_isLoggingOut) {
-          await _onDiscourseLoggedOut(
-            source: 'error_response_header',
-            triggerInfo: '${error.requestOptions.method} ${error.requestOptions.uri} → ${error.response?.statusCode}',
-            requestOptions: error.requestOptions,
-            statusCode: error.response?.statusCode,
-            responseHeaders: error.response?.headers.map,
-          );
-          return handler.next(error);
-        }
+          if (_tToken != null && _tToken!.isNotEmpty) {
+            options.headers['Discourse-Logged-In'] = 'true';
+            options.headers['Discourse-Present'] = 'true';
+          }
 
-        if (!skipAuthCheck && data is Map && data['error_type'] == 'not_logged_in') {
-          final jarTToken = await _cookieJar.getTToken();
-          await AuthLogService().logAuthInvalid(
-            source: 'error_response',
-            reason: data['error_type']?.toString() ?? 'not_logged_in',
-            extra: {
-              'method': error.requestOptions.method,
-              'url': error.requestOptions.uri.toString(),
-              'statusCode': error.response?.statusCode,
-              'errors': data['errors'],
-              'jarHasToken': jarTToken != null && jarTToken.isNotEmpty,
-              'jarTokenLength': jarTToken?.length,
-              'memHasToken': _tToken != null && _tToken!.isNotEmpty,
-            },
-          );
-          final message = (data['errors'] as List?)?.first?.toString() ?? S.current.auth_loginExpiredRelogin;
-          await _handleAuthInvalid(
-            message,
-            source: 'error_response_body',
-            triggerInfo: '${error.requestOptions.method} ${error.requestOptions.uri} → ${error.response?.statusCode}, error_type=${data['error_type']}',
-          );
-        }
+          debugPrint('[DIO] ${options.method} ${options.uri}');
+          handler.next(options);
+        },
+        onResponse: (response, handler) async {
+          final skipAuthCheck =
+              response.requestOptions.extra['skipAuthCheck'] == true;
 
-        handler.next(error);
-      },
-    ));
+          final loggedOut = response.headers.value('discourse-logged-out');
+          if (!skipAuthCheck &&
+              loggedOut != null &&
+              loggedOut.isNotEmpty &&
+              !_isLoggingOut) {
+            await _onDiscourseLoggedOut(
+              source: 'response_header',
+              triggerInfo:
+                  '${response.requestOptions.method} ${response.requestOptions.uri} → ${response.statusCode}',
+              requestOptions: response.requestOptions,
+              statusCode: response.statusCode,
+              responseHeaders: response.headers.map,
+            );
+            return handler.next(response);
+          }
+
+          final tToken = await _cookieJar.getTToken();
+          if (tToken != null && tToken.isNotEmpty) {
+            _tToken = tToken;
+          }
+
+          final username = response.headers.value('x-discourse-username');
+          if (username != null &&
+              username.isNotEmpty &&
+              username != _username) {
+            _username = username;
+            _storage.write(key: DiscourseService._usernameKey, value: username);
+          }
+
+          debugPrint(
+            '[DIO] ${response.statusCode} ${response.requestOptions.uri}',
+          );
+          handler.next(response);
+        },
+        onError: (error, handler) async {
+          final skipAuthCheck =
+              error.requestOptions.extra['skipAuthCheck'] == true;
+          final data = error.response?.data;
+          debugPrint('[DIO] Error: ${error.response?.statusCode}');
+
+          // BAD CSRF 处理：清空 token → 刷新 → 重试原请求
+          // 用 extra 标记防止无限循环，只重试一次
+          if (error.response?.statusCode == 403 &&
+              _isBadCsrfResponse(data) &&
+              error.requestOptions.extra['_csrfRetried'] != true) {
+            debugPrint(
+              '[DIO] BAD CSRF detected, refreshing csrfToken and retrying',
+            );
+            _cookieSync.clearCsrfToken();
+            await _cookieSync.updateCsrfToken();
+            // 用新 token 重试原请求
+            final options = error.requestOptions;
+            options.extra['_csrfRetried'] = true;
+            final csrf = _cookieSync.csrfToken;
+            options.headers['X-CSRF-Token'] = (csrf == null || csrf.isEmpty)
+                ? 'undefined'
+                : csrf;
+            try {
+              final response = await _dio.fetch(options);
+              return handler.resolve(response);
+            } on DioException catch (e) {
+              return handler.next(e);
+            }
+          }
+
+          final loggedOut = error.response?.headers.value(
+            'discourse-logged-out',
+          );
+          if (!skipAuthCheck &&
+              loggedOut != null &&
+              loggedOut.isNotEmpty &&
+              !_isLoggingOut) {
+            await _onDiscourseLoggedOut(
+              source: 'error_response_header',
+              triggerInfo:
+                  '${error.requestOptions.method} ${error.requestOptions.uri} → ${error.response?.statusCode}',
+              requestOptions: error.requestOptions,
+              statusCode: error.response?.statusCode,
+              responseHeaders: error.response?.headers.map,
+            );
+            return handler.next(error);
+          }
+
+          if (!skipAuthCheck &&
+              data is Map &&
+              data['error_type'] == 'not_logged_in') {
+            final jarTToken = await _cookieJar.getTToken();
+            await AuthLogService().logAuthInvalid(
+              source: 'error_response',
+              reason: data['error_type']?.toString() ?? 'not_logged_in',
+              extra: {
+                'method': error.requestOptions.method,
+                'url': error.requestOptions.uri.toString(),
+                'statusCode': error.response?.statusCode,
+                'errors': data['errors'],
+                'jarHasToken': jarTToken != null && jarTToken.isNotEmpty,
+                'jarTokenLength': jarTToken?.length,
+                'memHasToken': _tToken != null && _tToken!.isNotEmpty,
+              },
+            );
+            final message =
+                (data['errors'] as List?)?.first?.toString() ??
+                S.current.auth_loginExpiredRelogin;
+            await _handleAuthInvalid(
+              message,
+              source: 'error_response_body',
+              triggerInfo:
+                  '${error.requestOptions.method} ${error.requestOptions.uri} → ${error.response?.statusCode}, error_type=${data['error_type']}',
+            );
+          }
+
+          handler.next(error);
+        },
+      ),
+    );
   }
 
   /// 收到 discourse-logged-out header 时的处理
@@ -132,11 +151,13 @@ mixin _AuthMixin on _DiscourseServiceBase {
   /// 不立即 logout（不可逆），而是先验证 session 是否真的失效。
   /// Discourse 官方 Web 前端收到此 header 也只是弹提示，并不强制登出。
   ///
-  /// 验证方式：通过 PreloadedDataService 请求首页 HTML，
-  /// 检查 data-preloaded 中是否包含 currentUser。
-  /// 该请求共享同一个 CookieJar，会携带当前 _t。
-  /// 如果服务器真的不认 _t，返回的 HTML 不含 currentUser → 真正登出。
-  /// 如果服务器认可 _t（瞬态误判），返回的 HTML 包含 currentUser → 忽略。
+  /// 验证方式：
+  /// 1. 如果 _t 已不存在，直接视为已退出。
+  /// 2. 否则只刷新一次首页预加载数据。
+  /// 3. 若首页能解析出 currentUser，认为 session 仍有效。
+  /// 4. 若首页没有 currentUser，但 _t 仍存在，视为模糊信号，暂不自动退出。
+  ///
+  /// 这样可以避免因为隐藏 WebView 的额外验证链路导致误判或重复请求。
   Future<void> _onDiscourseLoggedOut({
     required String source,
     required String triggerInfo,
@@ -174,12 +195,15 @@ mixin _AuthMixin on _DiscourseServiceBase {
 
     // _t 存在 → 验证 session 是否真的失效
     _isVerifyingSession = true;
-    debugPrint('[Auth] discourse-logged-out: 开始验证 session (trigger: $triggerInfo)');
+    debugPrint(
+      '[Auth] discourse-logged-out: 开始验证 session (trigger: $triggerInfo)',
+    );
 
     try {
-      // 通过 PreloadedDataService 验证：它会请求首页 HTML 并解析 currentUser
-      await PreloadedDataService().refresh();
-      final currentUser = PreloadedDataService().currentUserSync;
+      final preloaded = PreloadedDataService();
+      await preloaded.refresh();
+      final currentUser = preloaded.currentUserSync;
+      final refreshedJarTToken = await _cookieJar.getTToken();
 
       if (currentUser != null) {
         // session 有效 → 忽略 discourse-logged-out（瞬态误判）
@@ -194,7 +218,7 @@ mixin _AuthMixin on _DiscourseServiceBase {
           'trigger': triggerInfo,
           'jarTokenLen': jarTToken.length,
         });
-      } else {
+      } else if (refreshedJarTToken == null || refreshedJarTToken.isEmpty) {
         // session 确实失效 → 登出
         debugPrint('[Auth] discourse-logged-out 验证失败: session 已失效');
         await AuthLogService().logAuthInvalid(
@@ -204,8 +228,8 @@ mixin _AuthMixin on _DiscourseServiceBase {
             'method': requestOptions.method,
             'url': requestOptions.uri.toString(),
             'statusCode': statusCode,
-            'jarHasToken': true,
-            'jarTokenLen': jarTToken.length,
+            'jarHasToken': false,
+            'jarTokenLen': 0,
             'memHasToken': _tToken != null && _tToken!.isNotEmpty,
             'verified': true,
           },
@@ -215,6 +239,18 @@ mixin _AuthMixin on _DiscourseServiceBase {
           source: source,
           triggerInfo: '$triggerInfo (verified)',
         );
+      } else {
+        debugPrint('[Auth] discourse-logged-out 验证结果模糊，暂不处理');
+        LogWriter.instance.write({
+          'timestamp': DateTime.now().toIso8601String(),
+          'level': 'warning',
+          'type': 'lifecycle',
+          'event': 'logout_verify_failed',
+          'message': 'discourse-logged-out 信号模糊：无 currentUser 但 _t 仍存在，暂不登出',
+          'source': source,
+          'trigger': triggerInfo,
+          'jarTokenLen': refreshedJarTToken.length,
+        });
       }
     } catch (e) {
       // 验证请求本身失败（网络错误等）→ 不要因为验证失败就登出
@@ -325,7 +361,8 @@ mixin _AuthMixin on _DiscourseServiceBase {
 
     // ===== 第三步：调用登出 API（可选，用新的 generation） =====
     if (callApi) {
-      final usernameForLogout = _username ?? await _storage.read(key: DiscourseService._usernameKey);
+      final usernameForLogout =
+          _username ?? await _storage.read(key: DiscourseService._usernameKey);
       try {
         if (usernameForLogout != null && usernameForLogout.isNotEmpty) {
           await _dio.delete('/session/$usernameForLogout');

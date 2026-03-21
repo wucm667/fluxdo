@@ -35,7 +35,7 @@ class CfChallengeInterceptor extends Interceptor {
 
   Future<bool> _doSync() async {
     await Future.delayed(const Duration(milliseconds: 1500));
-    await cookieJarService.syncFromWebView();
+    await cookieJarService.syncFromWebView(cookieNames: const {'cf_clearance'});
 
     String? cfClearance;
     for (var i = 0; i < 3; i++) {
@@ -43,7 +43,9 @@ class CfChallengeInterceptor extends Interceptor {
       if (cfClearance != null && cfClearance.isNotEmpty) break;
       debugPrint('[Dio] cf_clearance not found, retry ${i + 1}/3...');
       await Future.delayed(const Duration(milliseconds: 500));
-      await cookieJarService.syncFromWebView();
+      await cookieJarService.syncFromWebView(
+        cookieNames: const {'cf_clearance'},
+      );
     }
 
     if (cfClearance == null || cfClearance.isEmpty) {

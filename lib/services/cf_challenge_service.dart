@@ -210,8 +210,7 @@ class CfChallengeService {
     // 1. 先从 CookieJar 删除
     await cookieJarService.deleteCookie('cf_clearance');
     // 2. 同步到 WebView（此时 CookieJar 中已无 cf_clearance）
-    await cookieJarService.syncToWebView(
-    );
+    await cookieJarService.syncToWebView();
     // 3. 双重保障：直接从 WebView 中删除 cf_clearance
     //    避免 syncToWebView 的竞态导致旧值残留
     await _cfCookieManager.deleteCookie(
@@ -464,7 +463,7 @@ class _CfChallengePageState extends State<CfChallengePage> {
     await CookieJarService().syncCriticalCookiesFromController(
       controller,
       currentUrl: widget.verifyUrl,
-      cookieNames: const {'_t', '_forum_session', 'cf_clearance'},
+      cookieNames: const {'cf_clearance'},
     );
   }
 
@@ -568,7 +567,10 @@ class _CfChallengePageState extends State<CfChallengePage> {
         reason: 'new cf_clearance detected and page passed challenge',
       );
       await _syncLiveCookiesToCookieJar();
-      await CookieJarService().syncFromWebView(controller: _controller);
+      await CookieJarService().syncFromWebView(
+        controller: _controller,
+        cookieNames: const {'cf_clearance'},
+      );
       // 验证 cf_clearance 是否真正写入了 CookieJar
       final synced = await CookieJarService().getCfClearance();
       if (synced != null && synced.isNotEmpty) {
@@ -664,7 +666,10 @@ class _CfChallengePageState extends State<CfChallengePage> {
             reason: 'no challenge but new cf_clearance detected',
           );
           await _syncLiveCookiesToCookieJar();
-          await CookieJarService().syncFromWebView(controller: _controller);
+          await CookieJarService().syncFromWebView(
+            controller: _controller,
+            cookieNames: const {'cf_clearance'},
+          );
           _timeoutTimer?.cancel();
           if (mounted) _finish(true);
         } else {
@@ -709,7 +714,10 @@ class _CfChallengePageState extends State<CfChallengePage> {
         reason: 'polling detected new cf_clearance',
       );
       await _syncLiveCookiesToCookieJar();
-      await CookieJarService().syncFromWebView(controller: _controller);
+      await CookieJarService().syncFromWebView(
+        controller: _controller,
+        cookieNames: const {'cf_clearance'},
+      );
       _timeoutTimer?.cancel();
       if (mounted) _finish(true);
     } catch (e) {
@@ -1104,4 +1112,3 @@ class _CfChallengePageState extends State<CfChallengePage> {
     );
   }
 }
-
