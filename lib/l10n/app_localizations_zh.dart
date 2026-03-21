@@ -4705,6 +4705,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get networkAdapter_controlOptions => '控制选项';
 
   @override
+  String get networkSettings_maxConcurrent => '最大并发数';
+
+  @override
+  String get networkSettings_maxPerWindow => '窗口请求上限';
+
+  @override
+  String get networkSettings_windowSeconds => '窗口时长';
+
+  @override
+  String get networkSettings_windowSecondsSuffix => '秒';
+
+  @override
   String get networkAdapter_forceFallback => '强制使用备用适配器';
 
   @override
@@ -9845,6 +9857,18 @@ class AppLocalizationsZhHk extends AppLocalizationsZh {
   String get networkAdapter_controlOptions => '控制選項';
 
   @override
+  String get networkSettings_maxConcurrent => '最大並發數';
+
+  @override
+  String get networkSettings_maxPerWindow => '窗口請求上限';
+
+  @override
+  String get networkSettings_windowSeconds => '窗口時長';
+
+  @override
+  String get networkSettings_windowSecondsSuffix => '秒';
+
+  @override
   String get networkAdapter_forceFallback => '強制使用備用適配器';
 
   @override
@@ -14983,6 +15007,18 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get networkAdapter_controlOptions => '控制選項';
+
+  @override
+  String get networkSettings_maxConcurrent => '最大並行數';
+
+  @override
+  String get networkSettings_maxPerWindow => '視窗請求上限';
+
+  @override
+  String get networkSettings_windowSeconds => '視窗時長';
+
+  @override
+  String get networkSettings_windowSecondsSuffix => '秒';
 
   @override
   String get networkAdapter_forceFallback => '強制使用備用介面卡';

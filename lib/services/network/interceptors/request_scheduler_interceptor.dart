@@ -5,6 +5,8 @@ import 'package:collection/collection.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import '../request_scheduler_config.dart';
+
 /// 请求优先级
 enum _Priority {
   high(0), // 用户写操作（POST/PUT/DELETE/PATCH）
@@ -50,16 +52,17 @@ class _PriorityQueue {
 }
 
 /// 滑动窗口速率限制器
+///
+/// 动态读取 [RequestSchedulerConfig] 的配置值，
+/// 用户修改设置后立即生效。
 class _RateLimiter {
-  final int maxPerWindow;
-  final Duration windowDuration;
   final _timestamps = Queue<DateTime>();
-
-  _RateLimiter({required this.maxPerWindow, required this.windowDuration});
 
   /// 驱逐过期时间戳
   void _evict(DateTime now) {
-    final cutoff = now.subtract(windowDuration);
+    final cutoff = now.subtract(
+      Duration(seconds: RequestSchedulerConfig.windowSeconds),
+    );
     while (_timestamps.isNotEmpty && _timestamps.first.isBefore(cutoff)) {
       _timestamps.removeFirst();
     }
@@ -68,16 +71,20 @@ class _RateLimiter {
   /// 是否可以发出请求
   bool canProceed() {
     _evict(DateTime.now());
-    return _timestamps.length < maxPerWindow;
+    return _timestamps.length < RequestSchedulerConfig.maxPerWindow;
   }
 
   /// 需要等待的时间（队列未满时返回 Duration.zero）
   Duration get waitDuration {
     final now = DateTime.now();
     _evict(now);
-    if (_timestamps.length < maxPerWindow) return Duration.zero;
+    if (_timestamps.length < RequestSchedulerConfig.maxPerWindow) {
+      return Duration.zero;
+    }
     // 最早的时间戳 + 窗口大小 - 当前时间
-    return _timestamps.first.add(windowDuration).difference(now);
+    return _timestamps.first
+        .add(Duration(seconds: RequestSchedulerConfig.windowSeconds))
+        .difference(now);
   }
 
   /// 记录一个请求发出
@@ -92,26 +99,15 @@ class _RateLimiter {
 /// - 优先级调度：用户操作 > 普通 GET > 后台静默请求
 /// - 取消过时请求：排队中的请求被 cancelToken 取消时自动跳过
 /// - 滑动窗口速率限制：防止密集请求触发服务端 429
+///
+/// 并发数和速率限制从 [RequestSchedulerConfig] 动态读取。
 class RequestSchedulerInterceptor extends Interceptor {
-  final int maxConcurrent;
-  final int maxPerWindow;
-  final Duration windowDuration;
-
   int _running = 0;
   int _sequence = 0;
   Timer? _pendingTimer;
 
   late final _PriorityQueue _queue = _PriorityQueue();
-  late final _RateLimiter _rateLimiter = _RateLimiter(
-    maxPerWindow: maxPerWindow,
-    windowDuration: windowDuration,
-  );
-
-  RequestSchedulerInterceptor({
-    this.maxConcurrent = 3,
-    this.maxPerWindow = 6,
-    this.windowDuration = const Duration(seconds: 3),
-  });
+  late final _RateLimiter _rateLimiter = _RateLimiter();
 
   /// 推断请求优先级
   _Priority _inferPriority(RequestOptions options) {
@@ -158,6 +154,7 @@ class RequestSchedulerInterceptor extends Interceptor {
     }
 
     final priority = _inferPriority(options);
+    final maxConcurrent = RequestSchedulerConfig.maxConcurrent;
 
     // cancelToken 已取消，直接拒绝
     if (options.cancelToken?.isCancelled ?? false) {
@@ -241,6 +238,7 @@ class RequestSchedulerInterceptor extends Interceptor {
   }
 
   void _scheduleNext() {
+    final maxConcurrent = RequestSchedulerConfig.maxConcurrent;
     while (_queue.isNotEmpty && _running < maxConcurrent) {
       final entry = _queue.removeFirst();
 

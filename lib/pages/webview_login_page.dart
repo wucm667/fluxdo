@@ -38,6 +38,7 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
   InAppWebViewController? _controller;
   bool _isLoading = true;
   bool _loginHandled = false;
+  bool _loginInProgress = false;
   String? _lastHomeResponseUrl;
   String _url = AppConstants.baseUrl;
   double _progress = 0;
@@ -340,93 +341,98 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
     InAppWebViewController controller, {
     String? currentUrl,
   }) async {
-    if (_loginHandled) return;
-
-    final username = await _readCurrentUsername(controller);
-    if (username == null || username.isEmpty) {
-      if (_lastHomeResponseUrl != null &&
-          _isHomePageUrl(_lastHomeResponseUrl)) {
-        _scheduleLoginRecheck(controller);
-      }
-      return;
-    }
-
-    currentUrl ??= (await controller.getUrl())?.toString();
-    final tToken = await _readTTokenFromWebView(
-      controller,
-      currentUrl: currentUrl,
-    );
-    if (tToken == null || tToken.isEmpty) {
-      debugPrint('[Login] 已检测到 currentUser=$username，但尚未读到 _t，等待后续同步');
-      _scheduleLoginRecheck(controller);
-      return;
-    }
-
-    _loginHandled = true;
+    if (_loginHandled || _loginInProgress) return;
+    _loginInProgress = true;
 
     try {
-      await _service.saveUsername(username);
-      await _syncCsrfFromPage(controller);
+      final username = await _readCurrentUsername(controller);
+      if (username == null || username.isEmpty) {
+        if (_lastHomeResponseUrl != null &&
+            _isHomePageUrl(_lastHomeResponseUrl)) {
+          _scheduleLoginRecheck(controller);
+        }
+        return;
+      }
 
-      // 先切断旧请求，防止 syncFromWebView 期间旧响应的 Set-Cookie 写入竞争
-      AuthSession().advance();
-
-      // Windows 上先用 DevTools 实时 cookie 回写关键登录态，再做常规同步。
-      await _cookieJar.syncCriticalCookiesFromController(
+      currentUrl ??= (await controller.getUrl())?.toString();
+      final tToken = await _readTTokenFromWebView(
         controller,
         currentUrl: currentUrl,
-        cookieNames: const {'_t', '_forum_session', 'cf_clearance'},
       );
-      // 登录后从 WebView 同步所有 Cookie 到 CookieJar（包括 _t、cf_clearance 等）
-      // syncFromWebView 内部会先清掉关键 cookie 的旧值，确保 WebView 的值不被残留的 host-only cookie 覆盖
-      await _cookieJar.syncFromWebView(
-        currentUrl: currentUrl,
-        controller: controller,
-      );
+      if (tToken == null || tToken.isEmpty) {
+        debugPrint('[Login] 已检测到 currentUser=$username，但尚未读到 _t，等待后续同步');
+        _scheduleLoginRecheck(controller);
+        return;
+      }
 
-      final jarToken = await _cookieJar.getTToken();
-      final effectiveToken = (jarToken != null && jarToken.isNotEmpty)
-          ? jarToken
-          : tToken;
-      final tokenMatch = jarToken == tToken;
-      if (!tokenMatch) {
-        debugPrint(
-          '[Login] _t 不一致! WebView=${tToken.length}chars, Jar=${jarToken?.length}chars',
+      _loginHandled = true;
+
+      try {
+        await _service.saveUsername(username);
+        await _syncCsrfFromPage(controller);
+
+        // 先切断旧请求，防止 syncFromWebView 期间旧响应的 Set-Cookie 写入竞争
+        AuthSession().advance();
+
+        // Windows 上先用 DevTools 实时 cookie 回写关键登录态，再做常规同步。
+        await _cookieJar.syncCriticalCookiesFromController(
+          controller,
+          currentUrl: currentUrl,
+          cookieNames: const {'_t', '_forum_session', 'cf_clearance'},
         );
-      }
+        // 登录后从 WebView 同步所有 Cookie 到 CookieJar（包括 _t、cf_clearance 等）
+        // syncFromWebView 内部会先清掉关键 cookie 的旧值，确保 WebView 的值不被残留的 host-only cookie 覆盖
+        await _cookieJar.syncFromWebView(
+          currentUrl: currentUrl,
+          controller: controller,
+        );
 
-      // 仅设置 token，暂不广播
-      _service.setToken(effectiveToken);
-      final reusedPreloaded = _canReuseHomePageData(currentUrl)
-          ? await _hydratePreloadedFromPage(controller)
-          : false;
-      if (!reusedPreloaded) {
-        debugPrint('[Login] 当前页面无可复用首页数据，回退到 HTTP refresh');
-        await PreloadedDataService().refresh();
-      }
-      // 数据就绪后再广播（触发 provider rebuild + MessageBus 初始化）
-      _service.onLoginSuccess(effectiveToken);
+        final jarToken = await _cookieJar.getTToken();
+        final effectiveToken = (jarToken != null && jarToken.isNotEmpty)
+            ? jarToken
+            : tToken;
+        final tokenMatch = jarToken == tToken;
+        if (!tokenMatch) {
+          debugPrint(
+            '[Login] _t 不一致! WebView=${tToken.length}chars, Jar=${jarToken?.length}chars',
+          );
+        }
 
-      // 记录登录日志
-      LogWriter.instance.write({
-        'timestamp': DateTime.now().toIso8601String(),
-        'level': 'info',
-        'type': 'lifecycle',
-        'event': 'login',
-        'message': '用户登录成功',
-        'username': username,
-        'jarTokenLen': jarToken?.length,
-        'webViewTokenLen': tToken.length,
-        'tokenMatch': tokenMatch,
-      });
+        // 仅设置 token，暂不广播
+        _service.setToken(effectiveToken);
+        final reusedPreloaded = _canReuseHomePageData(currentUrl)
+            ? await _hydratePreloadedFromPage(controller)
+            : false;
+        if (!reusedPreloaded) {
+          debugPrint('[Login] 当前页面无可复用首页数据，回退到 HTTP refresh');
+          await PreloadedDataService().refresh();
+        }
+        // 数据就绪后再广播（触发 provider rebuild + MessageBus 初始化）
+        _service.onLoginSuccess(effectiveToken);
 
-      if (mounted) {
-        ToastService.showSuccess(S.current.webviewLogin_loginSuccess);
-        Navigator.of(context).pop(true);
+        // 记录登录日志
+        LogWriter.instance.write({
+          'timestamp': DateTime.now().toIso8601String(),
+          'level': 'info',
+          'type': 'lifecycle',
+          'event': 'login',
+          'message': '用户登录成功',
+          'username': username,
+          'jarTokenLen': jarToken?.length,
+          'webViewTokenLen': tToken.length,
+          'tokenMatch': tokenMatch,
+        });
+
+        if (mounted) {
+          ToastService.showSuccess(S.current.webviewLogin_loginSuccess);
+          Navigator.of(context).pop(true);
+        }
+      } catch (e) {
+        _loginHandled = false;
+        debugPrint('[Login] 登录态同步失败: $e');
       }
-    } catch (e) {
-      _loginHandled = false;
-      debugPrint('[Login] 登录态同步失败: $e');
+    } finally {
+      _loginInProgress = false;
     }
   }
 

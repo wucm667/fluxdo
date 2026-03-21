@@ -23,9 +23,9 @@ class DiscourseDio {
     Duration receiveTimeout = const Duration(seconds: 30),
     Map<String, dynamic>? defaultHeaders,
     String? baseUrl,
+    /// null 表示不限制（用于下载、MessageBus 等），非 null 启用调度器。
+    /// 实际并发数和速率从 [RequestSchedulerConfig] 动态读取。
     int? maxConcurrent = 3,
-    int? maxPerWindow,
-    Duration? windowDuration,
     bool enableRetry = true,
     bool enableCfChallenge = true,
   }) {
@@ -49,15 +49,10 @@ class DiscourseDio {
     // 2. 会话代守卫（最先执行，确保过期请求不进入后续拦截器）
     dio.interceptors.add(SessionGuardInterceptor());
 
-    // 3. 并发限制（null 表示不限制）
+    // 3. 并发限制 + 滑动窗口速率限制（null 表示不限制）
+    // 实际参数从 RequestSchedulerConfig 动态读取
     if (maxConcurrent != null) {
-      dio.interceptors.add(
-        RequestSchedulerInterceptor(
-          maxConcurrent: maxConcurrent,
-          maxPerWindow: maxPerWindow ?? 6,
-          windowDuration: windowDuration ?? const Duration(seconds: 3),
-        ),
-      );
+      dio.interceptors.add(RequestSchedulerInterceptor());
     }
 
     // 4. Cookie 管理

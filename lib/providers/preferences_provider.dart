@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 // ignore: depend_on_referenced_packages
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/network/request_scheduler_config.dart';
 import 'theme_provider.dart';
 
 class AppPreferences {
@@ -27,6 +28,12 @@ class AppPreferences {
   final bool hideBarOnScroll;
   /// 退出时清除图片缓存
   final bool clearCacheOnExit;
+  /// 最大并发请求数
+  final int maxConcurrent;
+  /// 滑动窗口内最大请求数
+  final int maxPerWindow;
+  /// 滑动窗口时长（秒）
+  final int windowSeconds;
 
   const AppPreferences({
     required this.autoPanguSpacing,
@@ -41,6 +48,9 @@ class AppPreferences {
     required this.portraitLock,
     required this.hideBarOnScroll,
     required this.clearCacheOnExit,
+    required this.maxConcurrent,
+    required this.maxPerWindow,
+    required this.windowSeconds,
   });
 
   AppPreferences copyWith({
@@ -56,6 +66,9 @@ class AppPreferences {
     bool? portraitLock,
     bool? hideBarOnScroll,
     bool? clearCacheOnExit,
+    int? maxConcurrent,
+    int? maxPerWindow,
+    int? windowSeconds,
   }) {
     return AppPreferences(
       autoPanguSpacing: autoPanguSpacing ?? this.autoPanguSpacing,
@@ -71,6 +84,9 @@ class AppPreferences {
       portraitLock: portraitLock ?? this.portraitLock,
       hideBarOnScroll: hideBarOnScroll ?? this.hideBarOnScroll,
       clearCacheOnExit: clearCacheOnExit ?? this.clearCacheOnExit,
+      maxConcurrent: maxConcurrent ?? this.maxConcurrent,
+      maxPerWindow: maxPerWindow ?? this.maxPerWindow,
+      windowSeconds: windowSeconds ?? this.windowSeconds,
     );
   }
 }
@@ -89,6 +105,9 @@ class PreferencesNotifier extends StateNotifier<AppPreferences> {
   static const String _portraitLockKey = 'pref_portrait_lock';
   static const String _hideBarOnScrollKey = 'pref_hide_bar_on_scroll';
   static const String _clearCacheOnExitKey = 'pref_clear_cache_on_exit';
+  static const String _maxConcurrentKey = 'pref_max_concurrent';
+  static const String _maxPerWindowKey = 'pref_max_per_window';
+  static const String _windowSecondsKey = 'pref_window_seconds';
 
   static const _crashlyticsChannel =
       MethodChannel('com.github.lingyan000.fluxdo/crashlytics');
@@ -109,9 +128,13 @@ class PreferencesNotifier extends StateNotifier<AppPreferences> {
             portraitLock: _prefs.getBool(_portraitLockKey) ?? false,
             hideBarOnScroll: _prefs.getBool(_hideBarOnScrollKey) ?? true,
             clearCacheOnExit: _prefs.getBool(_clearCacheOnExitKey) ?? false,
+            maxConcurrent: _prefs.getInt(_maxConcurrentKey) ?? 3,
+            maxPerWindow: _prefs.getInt(_maxPerWindowKey) ?? 6,
+            windowSeconds: _prefs.getInt(_windowSecondsKey) ?? 3,
           ),
         ) {
     isPortraitLocked = state.portraitLock;
+    _syncSchedulerConfig();
   }
 
   final SharedPreferences _prefs;
@@ -191,6 +214,33 @@ class PreferencesNotifier extends StateNotifier<AppPreferences> {
   Future<void> setClearCacheOnExit(bool enabled) async {
     state = state.copyWith(clearCacheOnExit: enabled);
     await _prefs.setBool(_clearCacheOnExitKey, enabled);
+  }
+
+  Future<void> setMaxConcurrent(int value) async {
+    final clamped = value.clamp(1, 10);
+    state = state.copyWith(maxConcurrent: clamped);
+    await _prefs.setInt(_maxConcurrentKey, clamped);
+    RequestSchedulerConfig.maxConcurrent = clamped;
+  }
+
+  Future<void> setMaxPerWindow(int value) async {
+    final clamped = value.clamp(2, 30);
+    state = state.copyWith(maxPerWindow: clamped);
+    await _prefs.setInt(_maxPerWindowKey, clamped);
+    RequestSchedulerConfig.maxPerWindow = clamped;
+  }
+
+  Future<void> setWindowSeconds(int value) async {
+    final clamped = value.clamp(1, 10);
+    state = state.copyWith(windowSeconds: clamped);
+    await _prefs.setInt(_windowSecondsKey, clamped);
+    RequestSchedulerConfig.windowSeconds = clamped;
+  }
+
+  void _syncSchedulerConfig() {
+    RequestSchedulerConfig.maxConcurrent = state.maxConcurrent;
+    RequestSchedulerConfig.maxPerWindow = state.maxPerWindow;
+    RequestSchedulerConfig.windowSeconds = state.windowSeconds;
   }
 
   /// 当前竖屏锁定状态（供视频播放器等无法访问 ref 的组件使用）

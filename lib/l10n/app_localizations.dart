@@ -8759,6 +8759,30 @@ abstract class AppLocalizations {
   /// **'控制选项'**
   String get networkAdapter_controlOptions;
 
+  /// No description provided for @networkSettings_maxConcurrent.
+  ///
+  /// In zh, this message translates to:
+  /// **'最大并发数'**
+  String get networkSettings_maxConcurrent;
+
+  /// No description provided for @networkSettings_maxPerWindow.
+  ///
+  /// In zh, this message translates to:
+  /// **'窗口请求上限'**
+  String get networkSettings_maxPerWindow;
+
+  /// No description provided for @networkSettings_windowSeconds.
+  ///
+  /// In zh, this message translates to:
+  /// **'窗口时长'**
+  String get networkSettings_windowSeconds;
+
+  /// No description provided for @networkSettings_windowSecondsSuffix.
+  ///
+  /// In zh, this message translates to:
+  /// **'秒'**
+  String get networkSettings_windowSecondsSuffix;
+
   /// No description provided for @networkAdapter_forceFallback.
   ///
   /// In zh, this message translates to:

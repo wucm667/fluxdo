@@ -4788,6 +4788,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get networkAdapter_controlOptions => 'Control options';
 
   @override
+  String get networkSettings_maxConcurrent => 'Max concurrent requests';
+
+  @override
+  String get networkSettings_maxPerWindow => 'Requests per window';
+
+  @override
+  String get networkSettings_windowSeconds => 'Window duration';
+
+  @override
+  String get networkSettings_windowSecondsSuffix => 's';
+
+  @override
   String get networkAdapter_forceFallback => 'Force fallback adapter';
 
   @override

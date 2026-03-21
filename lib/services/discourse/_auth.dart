@@ -2,8 +2,6 @@ part of 'discourse_service.dart';
 
 /// 认证相关
 mixin _AuthMixin on _DiscourseServiceBase {
-  /// 正在验证 session 是否真正失效（防止并发验证）
-  bool _isVerifyingSession = false;
 
   /// 初始化拦截器
   void _initInterceptors() {
@@ -148,16 +146,13 @@ mixin _AuthMixin on _DiscourseServiceBase {
 
   /// 收到 discourse-logged-out header 时的处理
   ///
-  /// 不立即 logout（不可逆），而是先验证 session 是否真的失效。
-  /// Discourse 官方 Web 前端收到此 header 也只是弹提示，并不强制登出。
+  /// 服务端在以下情况设置此 header（BAD_TOKEN）：
+  /// 1. 有 _t cookie 但 UserAuthToken.lookup 找不到对应用户（token 已失效）
+  /// 2. 没有 _t cookie 但请求带了 Discourse-Logged-In header
   ///
-  /// 验证方式：
-  /// 1. 如果 _t 已不存在，直接视为已退出。
-  /// 2. 否则只刷新一次首页预加载数据。
-  /// 3. 若首页能解析出 currentUser，认为 session 仍有效。
-  /// 4. 若首页没有 currentUser，但 _t 仍存在，视为模糊信号，暂不自动退出。
-  ///
-  /// 这样可以避免因为隐藏 WebView 的额外验证链路导致误判或重复请求。
+  /// Discourse 官方前端：弹对话框 → window.location 刷新，不做二次验证。
+  /// 我们也直接信任此信号触发登出。之前的二次验证（请求首页检查 currentUser）
+  /// 会清除 CDN URL 等基础数据，导致头像 URL 降级到主域名 → 403 → 雪崩。
   Future<void> _onDiscourseLoggedOut({
     required String source,
     required String triggerInfo,
@@ -165,109 +160,30 @@ mixin _AuthMixin on _DiscourseServiceBase {
     int? statusCode,
     Map<String, List<String>>? responseHeaders,
   }) async {
-    // 已在验证中或已在登出中，跳过
-    if (_isVerifyingSession || _isLoggingOut) return;
+    // _handleAuthInvalid 内部有 _isLoggingOut 锁，防止重复处理
+    if (_isLoggingOut) return;
+
+    debugPrint('[Auth] discourse-logged-out: $triggerInfo');
 
     final jarTToken = await _cookieJar.getTToken();
-
-    // _t 已经不存在 → 确实需要登出（可能已被 Set-Cookie 删除）
-    if (jarTToken == null || jarTToken.isEmpty) {
-      debugPrint('[Auth] discourse-logged-out: _t 已不存在，直接登出');
-      await AuthLogService().logAuthInvalid(
-        source: source,
-        reason: 'discourse-logged-out',
-        extra: {
-          'method': requestOptions.method,
-          'url': requestOptions.uri.toString(),
-          'statusCode': statusCode,
-          'jarHasToken': false,
-          'memHasToken': _tToken != null && _tToken!.isNotEmpty,
-          'verified': false,
-        },
-      );
-      await _handleAuthInvalid(
-        S.current.auth_loginExpiredRelogin,
-        source: source,
-        triggerInfo: triggerInfo,
-      );
-      return;
-    }
-
-    // _t 存在 → 验证 session 是否真的失效
-    _isVerifyingSession = true;
-    debugPrint(
-      '[Auth] discourse-logged-out: 开始验证 session (trigger: $triggerInfo)',
+    await AuthLogService().logAuthInvalid(
+      source: source,
+      reason: 'discourse-logged-out',
+      extra: {
+        'method': requestOptions.method,
+        'url': requestOptions.uri.toString(),
+        'statusCode': statusCode,
+        'jarHasToken': jarTToken != null && jarTToken.isNotEmpty,
+        'jarTokenLen': jarTToken?.length,
+        'memHasToken': _tToken != null && _tToken!.isNotEmpty,
+      },
     );
 
-    try {
-      final preloaded = PreloadedDataService();
-      await preloaded.refresh();
-      final currentUser = preloaded.currentUserSync;
-      final refreshedJarTToken = await _cookieJar.getTToken();
-
-      if (currentUser != null) {
-        // session 有效 → 忽略 discourse-logged-out（瞬态误判）
-        debugPrint('[Auth] discourse-logged-out 验证通过: session 仍然有效，忽略');
-        LogWriter.instance.write({
-          'timestamp': DateTime.now().toIso8601String(),
-          'level': 'info',
-          'type': 'lifecycle',
-          'event': 'logout_prevented',
-          'message': 'discourse-logged-out 验证后 session 仍有效，忽略',
-          'source': source,
-          'trigger': triggerInfo,
-          'jarTokenLen': jarTToken.length,
-        });
-      } else if (refreshedJarTToken == null || refreshedJarTToken.isEmpty) {
-        // session 确实失效 → 登出
-        debugPrint('[Auth] discourse-logged-out 验证失败: session 已失效');
-        await AuthLogService().logAuthInvalid(
-          source: source,
-          reason: 'discourse-logged-out (verified)',
-          extra: {
-            'method': requestOptions.method,
-            'url': requestOptions.uri.toString(),
-            'statusCode': statusCode,
-            'jarHasToken': false,
-            'jarTokenLen': 0,
-            'memHasToken': _tToken != null && _tToken!.isNotEmpty,
-            'verified': true,
-          },
-        );
-        await _handleAuthInvalid(
-          S.current.auth_loginExpiredRelogin,
-          source: source,
-          triggerInfo: '$triggerInfo (verified)',
-        );
-      } else {
-        debugPrint('[Auth] discourse-logged-out 验证结果模糊，暂不处理');
-        LogWriter.instance.write({
-          'timestamp': DateTime.now().toIso8601String(),
-          'level': 'warning',
-          'type': 'lifecycle',
-          'event': 'logout_verify_failed',
-          'message': 'discourse-logged-out 信号模糊：无 currentUser 但 _t 仍存在，暂不登出',
-          'source': source,
-          'trigger': triggerInfo,
-          'jarTokenLen': refreshedJarTToken.length,
-        });
-      }
-    } catch (e) {
-      // 验证请求本身失败（网络错误等）→ 不要因为验证失败就登出
-      debugPrint('[Auth] discourse-logged-out 验证异常: $e，暂不处理');
-      LogWriter.instance.write({
-        'timestamp': DateTime.now().toIso8601String(),
-        'level': 'warning',
-        'type': 'lifecycle',
-        'event': 'logout_verify_failed',
-        'message': 'discourse-logged-out 验证请求失败，暂不登出',
-        'source': source,
-        'trigger': triggerInfo,
-        'error': e.toString(),
-      });
-    } finally {
-      _isVerifyingSession = false;
-    }
+    await _handleAuthInvalid(
+      S.current.auth_loginExpiredRelogin,
+      source: source,
+      triggerInfo: triggerInfo,
+    );
   }
 
   /// 判断响应是否为 BAD CSRF

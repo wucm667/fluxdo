@@ -12,6 +12,7 @@ import 'widgets/doh_settings_card.dart';
 import 'widgets/vpn_auto_toggle_card.dart';
 import 'widgets/cf_verify_card.dart';
 import 'widgets/advanced_settings_card.dart';
+import 'widgets/rate_limit_card.dart';
 import 'widgets/debug_tools_card.dart';
 
 /// 网络设置页面
@@ -116,6 +117,8 @@ class _NetworkSettingsPageState extends State<NetworkSettingsPage> {
               _buildSectionHeader(theme, context.l10n.networkSettings_advanced),
               const SizedBox(height: 12),
               const AdvancedSettingsCard(),
+              const SizedBox(height: 12),
+              const RateLimitCard(),
               const SizedBox(height: 24),
 
               // 调试

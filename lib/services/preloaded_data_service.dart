@@ -392,18 +392,23 @@ class PreloadedDataService {
     _topicTrackingStates = null;
     _enabledReactions = null;
     _topicTrackingStateMeta = null;
-    _sharedSessionKey = null;
-    _longPollingBaseUrl = null;
-    _baseUri = '';
-    _cdnUrl = null;
-    _s3CdnUrl = null;
-    _s3BaseUrl = null;
     _hasDiscourseSetup = false;
+    // 以下为站点级基础设施数据，不随用户登录状态变化。
+    // 下次 HTML 解析时会自然更新，refresh 窗口期内保留可避免
+    // UrlHelper CDN 降级和 MessageBus 连接中断。
+    // _cdnUrl, _s3CdnUrl, _s3BaseUrl, _baseUri
+    // _longPollingBaseUrl, _sharedSessionKey
   }
 
   /// 重置缓存（登出时调用）
   void reset() {
     _clearCachedData();
+    _baseUri = '';
+    _cdnUrl = null;
+    _s3CdnUrl = null;
+    _s3BaseUrl = null;
+    _sharedSessionKey = null;
+    _longPollingBaseUrl = null;
   }
 
   /// 确保数据已加载
