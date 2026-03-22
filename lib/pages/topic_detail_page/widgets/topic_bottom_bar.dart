@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../l10n/s.dart';
+import '../../../widgets/common/dismissible_popup_menu.dart';
 
 /// 话题详情页底部操作栏
 class TopicBottomBar extends StatelessWidget {
@@ -77,7 +78,7 @@ class TopicBottomBar extends StatelessWidget {
   }
 
   Widget _buildShareMenu(BuildContext context, ThemeData theme) {
-    return PopupMenuButton<String>(
+    return SwipeDismissiblePopupMenuButton<String>(
       icon: const Icon(Icons.share_outlined),
       iconColor: theme.colorScheme.onSurfaceVariant,
       tooltip: context.l10n.common_share,

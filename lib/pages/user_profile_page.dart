@@ -32,6 +32,7 @@ import 'search_page.dart';
 import 'follow_list_page.dart';
 import 'image_viewer_page.dart';
 import 'badge_page.dart';
+import '../widgets/common/dismissible_popup_menu.dart';
 import '../l10n/s.dart';
 
 /// 用户个人页
@@ -805,7 +806,7 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage>
             icon: const Icon(Icons.mail_outline_rounded),
             tooltip: context.l10n.userProfile_message,
           ),
-        PopupMenuButton<String>(
+        SwipeDismissiblePopupMenuButton<String>(
           icon: const Icon(Icons.more_vert),
           onSelected: (value) {
             switch (value) {

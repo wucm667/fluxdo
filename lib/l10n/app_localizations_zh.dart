@@ -3634,11 +3634,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get preferences_crashlyticsDesc => '发生崩溃时自动上报日志，帮助开发者定位问题';
 
   @override
-  String get preferences_enableCrashlyticsTitle => '开启崩溃日志上报';
+  String get preferences_enableCrashlyticsTitle => '数据收集说明';
 
   @override
   String get preferences_enableCrashlyticsContent =>
-      '开启后，应用崩溃时会将崩溃日志上传到 Firebase Crashlytics 服务，帮助开发者快速定位和修复问题。\n\n上报内容仅包含崩溃堆栈信息和设备基本信息，不包含个人隐私数据。';
+      '本应用使用 Firebase Crashlytics 收集崩溃信息以改进应用稳定性。\n\n收集的数据包括设备信息和崩溃详情，不包含个人隐私数据。您可以在设置中关闭此功能。';
 
   @override
   String get profile_editProfile => '编辑资料';
@@ -8907,11 +8907,11 @@ class AppLocalizationsZhHk extends AppLocalizationsZh {
   String get preferences_crashlyticsDesc => '發生崩潰時自動上報日誌，幫助開發者定位問題';
 
   @override
-  String get preferences_enableCrashlyticsTitle => '開啓崩潰日誌上報';
+  String get preferences_enableCrashlyticsTitle => '數據收集說明';
 
   @override
   String get preferences_enableCrashlyticsContent =>
-      '開啓後，應用崩潰時會將崩潰日誌上傳到 Firebase Crashlytics 服務，幫助開發者快速定位和修復問題。\n\n上報內容僅包含崩潰堆棧信息和設備基本信息，不包含個人隱私數據。';
+      '本應用使用 Firebase Crashlytics 收集崩潰信息以改進應用穩定性。\n\n收集嘅數據包括設備信息同崩潰詳情，唔包含個人隱私數據。您可以喺設置中關閉此功能。';
 
   @override
   String get profile_editProfile => '編輯資料';
@@ -14059,11 +14059,11 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get preferences_crashlyticsDesc => '發生崩潰時自動上報日誌，幫助開發者定位問題';
 
   @override
-  String get preferences_enableCrashlyticsTitle => '開啟崩潰日誌上報';
+  String get preferences_enableCrashlyticsTitle => '資料收集說明';
 
   @override
   String get preferences_enableCrashlyticsContent =>
-      '開啟後，應用崩潰時會將崩潰日誌上傳到 Firebase Crashlytics 服務，幫助開發者快速定位和修復問題。\n\n上報內容僅包含崩潰堆疊資訊和裝置基本資訊，不包含個人隱私資料。';
+      '本應用使用 Firebase Crashlytics 收集崩潰資訊以改進應用穩定性。\n\n收集的資料包括裝置資訊和崩潰詳情，不包含個人隱私資料。您可以在設定中關閉此功能。';
 
   @override
   String get profile_editProfile => '編輯資料';

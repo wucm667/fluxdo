@@ -6752,13 +6752,13 @@ abstract class AppLocalizations {
   /// No description provided for @preferences_enableCrashlyticsTitle.
   ///
   /// In zh, this message translates to:
-  /// **'开启崩溃日志上报'**
+  /// **'数据收集说明'**
   String get preferences_enableCrashlyticsTitle;
 
   /// No description provided for @preferences_enableCrashlyticsContent.
   ///
   /// In zh, this message translates to:
-  /// **'开启后，应用崩溃时会将崩溃日志上传到 Firebase Crashlytics 服务，帮助开发者快速定位和修复问题。\n\n上报内容仅包含崩溃堆栈信息和设备基本信息，不包含个人隐私数据。'**
+  /// **'本应用使用 Firebase Crashlytics 收集崩溃信息以改进应用稳定性。\n\n收集的数据包括设备信息和崩溃详情，不包含个人隐私数据。您可以在设置中关闭此功能。'**
   String get preferences_enableCrashlyticsContent;
 
   /// No description provided for @profile_editProfile.

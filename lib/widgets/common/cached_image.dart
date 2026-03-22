@@ -91,7 +91,7 @@ class CachedImage extends StatelessWidget {
       fit: fit,
       gaplessPlayback: true,
       frameBuilder: placeholder != null ? _buildFrame : null,
-      errorBuilder: errorBuilder,
+      errorBuilder: errorBuilder ?? _defaultErrorBuilder,
     );
   }
 
@@ -105,5 +105,13 @@ class CachedImage extends StatelessWidget {
     if (wasSynchronouslyLoaded || frame != null) return child;
     // 图片未加载：显示占位
     return placeholder!(context);
+  }
+
+  static Widget _defaultErrorBuilder(
+    BuildContext context,
+    Object error,
+    StackTrace? stackTrace,
+  ) {
+    return const SizedBox.shrink();
   }
 }

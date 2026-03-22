@@ -1170,8 +1170,8 @@
   "preferences_advanced": "Advanced",
   "preferences_crashlytics": "Crash reporting",
   "preferences_crashlyticsDesc": "Auto-report crash logs to help developers",
-  "preferences_enableCrashlyticsTitle": "Enable crash reporting",
-  "preferences_enableCrashlyticsContent": "When enabled, crash logs will be uploaded to Firebase Crashlytics to help developers fix issues.\n\nOnly crash stack traces and basic device info are reported, no personal data.",
+  "preferences_enableCrashlyticsTitle": "Data Collection Notice",
+  "preferences_enableCrashlyticsContent": "This app uses Firebase Crashlytics to collect crash information to improve stability.\n\nCollected data includes device info and crash details, no personal data. You can disable this in Settings.",
 
   "profile_editProfile": "Edit profile",
   "profile_confirmLogout": "Confirm logout",

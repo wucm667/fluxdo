@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../services/log/logger_utils.dart';
 import '../services/toast_service.dart';
+import '../widgets/common/dismissible_popup_menu.dart';
 import '../l10n/s.dart';
 
 /// 日志筛选类型
@@ -470,7 +471,7 @@ class _AppLogsPageState extends State<AppLogsPage> {
         title: Text(context.l10n.appLogs_title),
         centerTitle: true,
         actions: [
-          PopupMenuButton<String>(
+          SwipeDismissiblePopupMenuButton<String>(
             onSelected: (value) {
               switch (value) {
                 case 'deviceInfo':

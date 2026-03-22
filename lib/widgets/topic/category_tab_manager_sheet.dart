@@ -8,6 +8,7 @@ import '../../utils/font_awesome_helper.dart';
 import '../../services/discourse_cache_manager.dart';
 import '../../utils/url_helper.dart';
 import '../../pages/category_topics_page.dart';
+import '../../widgets/common/dismissible_popup_menu.dart';
 import '../../../../../l10n/s.dart';
 
 // ============================================================
@@ -86,7 +87,7 @@ Future<void> _showSubcategoryMenu({
   required VoidCallback onDone,
 }) async {
   final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
-  final result = await showMenu<Category>(
+  final result = await showSwipeDismissibleMenu<Category>(
     context: context,
     position: RelativeRect.fromRect(
       Rect.fromCenter(center: tapPosition, width: 0, height: 0),
@@ -657,7 +658,7 @@ class _EditContent extends ConsumerWidget {
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     final allItems = [parent, ...subcategories];
 
-    final result = await showMenu<Category>(
+    final result = await showSwipeDismissibleMenu<Category>(
       context: context,
       position: RelativeRect.fromRect(
         Rect.fromCenter(center: tapPosition, width: 0, height: 0),

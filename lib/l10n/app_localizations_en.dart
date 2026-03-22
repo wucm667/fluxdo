@@ -3698,11 +3698,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Auto-report crash logs to help developers';
 
   @override
-  String get preferences_enableCrashlyticsTitle => 'Enable crash reporting';
+  String get preferences_enableCrashlyticsTitle => 'Data Collection Notice';
 
   @override
   String get preferences_enableCrashlyticsContent =>
-      'When enabled, crash logs will be uploaded to Firebase Crashlytics to help developers fix issues.\n\nOnly crash stack traces and basic device info are reported, no personal data.';
+      'This app uses Firebase Crashlytics to collect crash information to improve stability.\n\nCollected data includes device info and crash details, no personal data. You can disable this in Settings.';
 
   @override
   String get profile_editProfile => 'Edit profile';

@@ -34,6 +34,7 @@ import '../../widgets/post/post_replies_sheet.dart';
 import '../../widgets/post/reply_sheet.dart';
 import '../../widgets/topic/topic_progress.dart';
 import '../../widgets/topic/topic_notification_button.dart';
+import '../../widgets/common/dismissible_popup_menu.dart';
 import '../../widgets/common/emoji_text.dart';
 import '../../widgets/common/error_view.dart';
 import '../../widgets/content/discourse_html_content/chunked/chunked_html_content.dart';
@@ -614,7 +615,7 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage>
         },
       ),
       // 更多选项
-      PopupMenuButton<String>(
+      SwipeDismissiblePopupMenuButton<String>(
         icon: const Icon(Icons.more_vert),
         tooltip: context.l10n.topicDetail_moreOptions,
         onSelected: (value) {

@@ -10,6 +10,7 @@ import '../../../models/topic.dart';
 import '../../../services/discourse/discourse_service.dart';
 import '../../../services/toast_service.dart';
 import '../../../widgets/share/ai_share_image_preview.dart';
+import '../../../widgets/common/dismissible_popup_menu.dart';
 import 'ai_chat_input.dart';
 import 'ai_chat_message_item.dart';
 import 'ai_context_selector.dart';
@@ -381,7 +382,7 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
                                   iconSize: 20,
                                   onPressed: _enterSelectionMode,
                                 ),
-                              PopupMenuButton<String>(
+                              SwipeDismissiblePopupMenuButton<String>(
                                 icon: const Icon(Icons.more_vert),
                                 tooltip: context.l10n.ai_moreTooltip,
                                 iconSize: 20,
@@ -718,7 +719,7 @@ class _AiModelSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return PopupMenuButton<int>(
+    return SwipeDismissiblePopupMenuButton<int>(
       tooltip: S.current.ai_selectModel,
       onSelected: (index) => onChanged(allModels[index]),
       child: Padding(

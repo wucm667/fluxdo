@@ -1316,8 +1316,8 @@
   "preferences_advanced": "高级",
   "preferences_crashlytics": "崩溃日志上报",
   "preferences_crashlyticsDesc": "发生崩溃时自动上报日志，帮助开发者定位问题",
-  "preferences_enableCrashlyticsTitle": "开启崩溃日志上报",
-  "preferences_enableCrashlyticsContent": "开启后，应用崩溃时会将崩溃日志上传到 Firebase Crashlytics 服务，帮助开发者快速定位和修复问题。\n\n上报内容仅包含崩溃堆栈信息和设备基本信息，不包含个人隐私数据。",
+  "preferences_enableCrashlyticsTitle": "数据收集说明",
+  "preferences_enableCrashlyticsContent": "本应用使用 Firebase Crashlytics 收集崩溃信息以改进应用稳定性。\n\n收集的数据包括设备信息和崩溃详情，不包含个人隐私数据。您可以在设置中关闭此功能。",
 
   "profile_editProfile": "编辑资料",
   "profile_confirmLogout": "确认退出",

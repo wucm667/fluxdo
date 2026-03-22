@@ -5,6 +5,7 @@ import '../../l10n/s.dart';
 import '../../services/network/doh/doh_resolver.dart';
 import '../../services/network/doh/network_settings_service.dart';
 import '../../services/toast_service.dart';
+import '../../widgets/common/dismissible_popup_menu.dart';
 
 /// DOH 详细设置页面（服务器列表、IPv6、服务端 IP、ECH）
 class DohDetailSettingsPage extends StatefulWidget {
@@ -290,7 +291,7 @@ class _DohDetailSettingsPageState extends State<DohDetailSettingsPage> {
                 visualDensity: VisualDensity.compact,
               ),
             ),
-          PopupMenuButton<String>(
+          SwipeDismissiblePopupMenuButton<String>(
             icon: Icon(Icons.more_vert, size: 20, color: theme.colorScheme.onSurfaceVariant),
             tooltip: S.current.common_more,
             padding: EdgeInsets.zero,

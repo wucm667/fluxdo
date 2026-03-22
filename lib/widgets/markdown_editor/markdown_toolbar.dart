@@ -17,6 +17,7 @@ import '../common/fading_edge_scroll_view.dart';
 import 'image_upload_dialog.dart';
 import 'link_insert_dialog.dart';
 import 'template_insert_dialog.dart';
+import '../common/dismissible_popup_menu.dart';
 import '../../../../../l10n/s.dart';
 
 /// Markdown 工具栏组件
@@ -851,7 +852,7 @@ class MarkdownToolbarState extends State<MarkdownToolbar> {
                           label: _uploadProgress,
                         ),
                         // 标题按钮（带弹出菜单）
-                        PopupMenuButton<int>(
+                        SwipeDismissiblePopupMenuButton<int>(
                           icon: FaIcon(
                             FontAwesomeIcons.heading,
                             size: 16,

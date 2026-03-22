@@ -16,6 +16,7 @@ import '../services/toast_service.dart';
 import '../services/webview_settings.dart';
 import '../services/windows_webview_environment_service.dart';
 import '../services/log/log_writer.dart';
+import '../widgets/common/dismissible_popup_menu.dart';
 import '../l10n/s.dart';
 
 /// WebView 登录页面（统一使用 flutter_inappwebview）
@@ -78,7 +79,7 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
             onPressed: _pasteEmailLoginLink,
           ),
           if (_savedUsername != null)
-            PopupMenuButton<String>(
+            SwipeDismissiblePopupMenuButton<String>(
               icon: const Icon(Icons.key_rounded),
               tooltip: context.l10n.webviewLogin_savedPassword,
               onSelected: (value) {

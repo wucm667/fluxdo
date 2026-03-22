@@ -5,6 +5,7 @@ import '../../providers/topic_list/sort_provider.dart';
 import '../../providers/topic_list/tab_state_provider.dart';
 import '../../providers/message_bus/topic_tracking_providers.dart';
 import 'sort_and_tags_bar.dart';
+import '../common/dismissible_popup_menu.dart';
 import '../../../../../l10n/s.dart';
 
 /// 下拉样式
@@ -58,7 +59,7 @@ class FilterDropdown extends ConsumerWidget {
       return base;
     }
 
-    return PopupMenuButton<TopicListFilter>(
+    return SwipeDismissiblePopupMenuButton<TopicListFilter>(
       onSelected: onFilterChanged,
       offset: const Offset(0, 36),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -167,7 +168,7 @@ class OrderDropdown extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final isActive = currentOrder != TopicSortOrder.defaultOrder;
 
-    return PopupMenuButton<TopicSortOrder>(
+    return SwipeDismissiblePopupMenuButton<TopicSortOrder>(
       onSelected: (order) {
         if (order == currentOrder && order != TopicSortOrder.defaultOrder) {
           // 再次点击已选中的排序项时，切换升降序

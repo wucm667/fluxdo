@@ -14,6 +14,7 @@ import '../widgets/common/app_link_confirm_dialog.dart';
 import '../providers/web_bookmark_provider.dart';
 import '../providers/web_history_provider.dart';
 import '../providers/download_provider.dart';
+import '../widgets/common/dismissible_popup_menu.dart';
 import '../l10n/s.dart';
 
 /// 通用内置浏览器页面
@@ -170,7 +171,7 @@ class _WebViewPageState extends ConsumerState<WebViewPage> {
               onPressed: () => _controller?.reload(),
               tooltip: context.l10n.common_refresh,
             ),
-            PopupMenuButton<String>(
+            SwipeDismissiblePopupMenuButton<String>(
               onSelected: _handleMenuAction,
               itemBuilder: (context) => [
                 PopupMenuItem(

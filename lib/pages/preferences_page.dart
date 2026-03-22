@@ -193,31 +193,8 @@ class PreferencesPage extends ConsumerWidget {
                       : theme.colorScheme.onSurfaceVariant,
                 ),
                 value: preferences.crashlytics,
-                onChanged: (value) async {
-                  if (value) {
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: Text(context.l10n.preferences_enableCrashlyticsTitle),
-                        content: Text(context.l10n.preferences_enableCrashlyticsContent),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: Text(context.l10n.common_cancel),
-                          ),
-                          FilledButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            child: Text(context.l10n.common_enable),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (confirmed == true) {
-                      ref.read(preferencesProvider.notifier).setCrashlytics(true);
-                    }
-                  } else {
-                    ref.read(preferencesProvider.notifier).setCrashlytics(false);
-                  }
+                onChanged: (value) {
+                  ref.read(preferencesProvider.notifier).setCrashlytics(value);
                 },
               ),
             ),

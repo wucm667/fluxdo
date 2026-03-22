@@ -27,16 +27,22 @@ class LocalNotificationService {
       requestSoundPermission: true,
     );
     const linuxSettings = LinuxInitializationSettings(defaultActionName: 'Open');
+    const windowsSettings = WindowsInitializationSettings(
+      appName: 'FluxDO',
+      appUserModelId: 'Com.FluxDO.FluxDO',
+      guid: 'e965ef8c-b676-47c1-b6e7-297d63942974',
+    );
 
     const settings = InitializationSettings(
       android: androidSettings,
       iOS: darwinSettings,
       macOS: darwinSettings,
       linux: linuxSettings,
+      windows: windowsSettings,
     );
 
     await _plugin.initialize(
-      settings,
+      settings: settings,
       onDidReceiveNotificationResponse: _onNotificationTapped,
     );
     _initialized = true;
@@ -119,6 +125,7 @@ class LocalNotificationService {
       android: androidDetails,
       iOS: darwinDetails,
       macOS: darwinDetails,
+      windows: const WindowsNotificationDetails(),
     );
 
     final notificationId = id ?? DateTime.now().millisecondsSinceEpoch.remainder(100000);
@@ -129,7 +136,7 @@ class LocalNotificationService {
       payload = postNumber != null ? 'topic:$topicId:$postNumber' : 'topic:$topicId';
     }
     
-    await _plugin.show(notificationId, title, body, details, payload: payload);
+    await _plugin.show(id: notificationId, title: title, body: body, notificationDetails: details, payload: payload);
     debugPrint('[LocalNotification] 已发送: $title, payload=$payload');
   }
 }

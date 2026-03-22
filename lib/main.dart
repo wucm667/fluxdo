@@ -135,15 +135,15 @@ Future<void> main() async {
   }
 
   // 阶段 2：依赖 prefs 的步骤并行
-  final crashlyticsEnabled = prefs.getBool('pref_crashlytics') ?? false;
+  final crashlyticsEnabled = prefs.getBool('pref_crashlytics') ?? true;
   await Future.wait([
     CfChallengeLogger.setEnabled(prefs.getBool('developer_mode') ?? false),
     CronetFallbackService.instance.initialize(prefs),
     ProxySettingsService.instance.initialize(prefs),
-    if (Platform.isAndroid && crashlyticsEnabled)
-      const MethodChannel(
+    if (Platform.isAndroid)
+      MethodChannel(
         'com.github.lingyan000.fluxdo/crashlytics',
-      ).invokeMethod('setCrashlyticsEnabled', {'enabled': true}),
+      ).invokeMethod('setCrashlyticsEnabled', {'enabled': crashlyticsEnabled}),
   ]);
   // rhttp (Rust reqwest) 初始化：在 ProxySettingsService 之后、NetworkSettingsService 之前
   await RhttpSettingsService.instance.initialize(prefs);
@@ -448,6 +448,11 @@ class _MainPageState extends ConsumerState<MainPage>
 
       // 自动检查更新
       _autoCheckUpdate();
+
+      // 一次性数据收集告知（仅 Android）
+      if (Platform.isAndroid) {
+        _showCrashlyticsNotice();
+      }
     });
     // 监听登录失效事件
     _authErrorSub = ref.listenManual<AsyncValue<String>>(authErrorProvider, (
@@ -525,6 +530,27 @@ class _MainPageState extends ConsumerState<MainPage>
     final prefs = ref.read(sharedPreferencesProvider);
     final updateService = UpdateService(prefs: prefs);
     await UpdateCheckerHelper.checkUpdateOnStartup(context, updateService);
+  }
+
+  Future<void> _showCrashlyticsNotice() async {
+    final prefs = ref.read(sharedPreferencesProvider);
+    if (prefs.getBool('crashlytics_notice_shown') ?? false) return;
+    await prefs.setBool('crashlytics_notice_shown', true);
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text(S.current.preferences_enableCrashlyticsTitle),
+        content: Text(S.current.preferences_enableCrashlyticsContent),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(S.current.common_confirm),
+          ),
+        ],
+      ),
+    );
   }
 
   void _onDestinationSelected(int index) {
