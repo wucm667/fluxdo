@@ -40,6 +40,51 @@ class DownloadService {
     );
   }
 
+  /// 通过 HEAD 请求从 Content-Disposition 获取原始文件名
+  Future<String?> fetchFileNameFromHeader(String url) async {
+    try {
+      final response = await _dio.head<void>(
+        url,
+        options: Options(
+          extra: {'skipCsrf': true, 'skipAuthCheck': true},
+          followRedirects: true,
+        ),
+      );
+      final disposition = response.headers.value('content-disposition');
+      if (disposition != null) {
+        return parseContentDisposition(disposition);
+      }
+    } catch (e) {
+      debugPrint('[DownloadService] HEAD 请求获取文件名失败: $e');
+    }
+    return null;
+  }
+
+  /// 解析 Content-Disposition header 中的文件名
+  ///
+  /// 优先使用 filename*=UTF-8''xxx（支持非 ASCII），
+  /// 回退到 filename="xxx"
+  static String? parseContentDisposition(String header) {
+    // 优先匹配 filename*=UTF-8''encoded_name
+    final starMatch =
+        RegExp(r"""filename\*\s*=\s*UTF-8''(.+?)(?:;|$)""", caseSensitive: false)
+            .firstMatch(header);
+    if (starMatch != null) {
+      final encoded = starMatch.group(1)!.trim();
+      try {
+        return Uri.decodeComponent(encoded);
+      } catch (_) {}
+    }
+    // 回退：filename="name" 或 filename=name
+    final match =
+        RegExp(r'filename\s*=\s*"?([^";]+)"?', caseSensitive: false)
+            .firstMatch(header);
+    if (match != null) {
+      return match.group(1)!.trim();
+    }
+    return null;
+  }
+
   /// 从 URL / suggestedFilename 解析文件名
   static String resolveFileName(String url, {String? suggestedFilename}) {
     // 优先使用建议文件名

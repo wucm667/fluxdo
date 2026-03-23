@@ -47,6 +47,11 @@ class DownloadNotifier extends StateNotifier<List<DownloadItem>> {
     String? mimeType,
     int? contentLength,
   }) async {
+    // 没有建议文件名时，通过 HEAD 请求从 Content-Disposition 获取原始文件名
+    if (suggestedFilename == null || suggestedFilename.isEmpty) {
+      suggestedFilename =
+          await DownloadService.instance.fetchFileNameFromHeader(url);
+    }
     final fileName =
         DownloadService.resolveFileName(url, suggestedFilename: suggestedFilename);
 
