@@ -241,6 +241,8 @@ class _WebViewPageState extends ConsumerState<WebViewPage> {
                     initialSettings: WebViewSettings.visible
                       ..useShouldOverrideUrlLoading = true,
                     shouldOverrideUrlLoading: _shouldOverrideUrlLoading,
+                    onReceivedServerTrustAuthRequest: (_, challenge) =>
+                        WebViewSettings.handleServerTrustAuthRequest(challenge),
                     onWebViewCreated: (controller) async {
                       _controller = controller;
                       if (io.Platform.isWindows && widget.url.isNotEmpty) {

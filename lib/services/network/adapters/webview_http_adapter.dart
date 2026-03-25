@@ -30,6 +30,8 @@ class WebViewHttpAdapter implements HttpClientAdapter {
       webViewEnvironment: WindowsWebViewEnvironmentService.instance.environment,
       initialUrlRequest: URLRequest(url: WebUri(AppConstants.baseUrl)),
       initialSettings: WebViewSettings.headless,
+      onReceivedServerTrustAuthRequest: (_, challenge) =>
+          WebViewSettings.handleServerTrustAuthRequest(challenge),
       onWebViewCreated: (controller) {
         _controller = controller;
 

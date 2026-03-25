@@ -166,6 +166,13 @@ mixin _AuthMixin on _DiscourseServiceBase {
     debugPrint('[Auth] discourse-logged-out: $triggerInfo');
 
     final jarTToken = await _cookieJar.getTToken();
+
+    // 从实际发出的请求 header 中提取 _t cookie 状态
+    final sentCookieHeader = requestOptions.headers['cookie']?.toString() ?? '';
+    final sentTMatch = RegExp(r'(?:^|;\s*)_t=([^;]*)').firstMatch(sentCookieHeader);
+    final sentHasT = sentTMatch != null;
+    final sentTLen = sentTMatch?.group(1)?.length;
+
     await AuthLogService().logAuthInvalid(
       source: source,
       reason: 'discourse-logged-out',
@@ -176,6 +183,10 @@ mixin _AuthMixin on _DiscourseServiceBase {
         'jarHasToken': jarTToken != null && jarTToken.isNotEmpty,
         'jarTokenLen': jarTToken?.length,
         'memHasToken': _tToken != null && _tToken!.isNotEmpty,
+        // 实际发出的请求中 _t cookie 的状态
+        'sentHasT': sentHasT,
+        'sentTLen': sentTLen,
+        'sentCookieLen': sentCookieHeader.length,
       },
     );
 
@@ -183,6 +194,8 @@ mixin _AuthMixin on _DiscourseServiceBase {
       S.current.auth_loginExpiredRelogin,
       source: source,
       triggerInfo: triggerInfo,
+      sentHasT: sentHasT,
+      sentTLen: sentTLen,
     );
   }
 
@@ -203,6 +216,8 @@ mixin _AuthMixin on _DiscourseServiceBase {
     String message, {
     String? source,
     String? triggerInfo,
+    bool? sentHasT,
+    int? sentTLen,
   }) async {
     if (_isLoggingOut) return;
     _isLoggingOut = true;
@@ -230,6 +245,9 @@ mixin _AuthMixin on _DiscourseServiceBase {
       'jarHasToken': jarTToken != null && jarTToken.isNotEmpty,
       'jarTokenLen': jarTToken?.length,
       'hasCsrf': csrfToken != null && csrfToken.isNotEmpty,
+      // 实际请求中 Cookie header 的 _t 状态（仅 discourse-logged-out 触发时有值）
+      if (sentHasT != null) 'sentHasT': sentHasT,
+      if (sentTLen != null) 'sentTLen': sentTLen,
     });
 
     await logout(callApi: false, refreshPreload: true);

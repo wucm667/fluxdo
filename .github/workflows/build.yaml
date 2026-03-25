@@ -123,6 +123,17 @@ jobs:
           mkdir -p dist
           mv build/app/outputs/flutter-apk/app-release.apk dist/fluxdo-${{ matrix.arch }}.apk
 
+      - name: Build DOH Proxy for iOS
+        if: matrix.platform == 'ios'
+        working-directory: core/doh_proxy
+        run: cargo rustc --release --target aarch64-apple-ios --features ech --lib --crate-type staticlib
+
+      - name: Copy iOS native libraries
+        if: matrix.platform == 'ios'
+        run: |
+          mkdir -p ios/rust_libs/device
+          cp core/doh_proxy/target/aarch64-apple-ios/release/libdoh_proxy.a ios/rust_libs/device/
+
       - name: Build iOS
         if: matrix.platform == 'ios'
         run: |

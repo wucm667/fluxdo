@@ -1,11 +1,15 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../l10n/s.dart';
 import '../../../services/network/doh/network_settings_service.dart';
+import '../../../services/network/doh_proxy/per_device_cert_service.dart';
 import '../../../services/network/vpn_auto_toggle_service.dart';
 import '../../../services/toast_service.dart';
 import '../doh_detail_settings_page.dart';
+import 'ios_cert_install_dialog.dart';
 
 /// DOH 设置卡片（简化版：开关 + 状态 + "更多设置"入口）
 class DohSettingsCard extends StatelessWidget {
@@ -69,6 +73,9 @@ class DohSettingsCard extends StatelessWidget {
 
           // 仅在开启 DOH 后显示以下内容
           if (settings.dohEnabled) ...[
+            // iOS 证书安装引导
+            if (Platform.isIOS) _IosCertGuide(isApplying: isApplying),
+
             // 状态区域
             Divider(height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2)),
             _buildStatusArea(context, theme, service, proxyService, isRunning, port, showLoading),
@@ -256,6 +263,74 @@ class DohSettingsCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// iOS 证书安装引导 Widget
+///
+/// 显示一个提示条，点击后打开证书安装对话框
+class _IosCertGuide extends StatefulWidget {
+  const _IosCertGuide({required this.isApplying});
+
+  final bool isApplying;
+
+  @override
+  State<_IosCertGuide> createState() => _IosCertGuideState();
+}
+
+class _IosCertGuideState extends State<_IosCertGuide> {
+  bool _installed = false;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkInstalled();
+  }
+
+  Future<void> _checkInstalled() async {
+    final installed = await PerDeviceCertService.instance.isCertInstalled();
+    if (mounted) setState(() { _installed = installed; _loading = false; });
+  }
+
+  Future<void> _showDialog() async {
+    final result = await showIosCertInstallDialog(context);
+    if (result == true && mounted) {
+      setState(() => _installed = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const SizedBox.shrink();
+
+    final theme = Theme.of(context);
+
+    return Column(
+      children: [
+        Divider(height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2)),
+        ListTile(
+          leading: Icon(
+            _installed ? Icons.verified_user : Icons.security,
+            color: _installed ? Colors.green : theme.colorScheme.error,
+          ),
+          title: Text(_installed ? 'CA 证书已安装' : '需要安装 CA 证书'),
+          subtitle: Text(
+            _installed ? '点击可重新安装或更换证书' : 'HTTPS 拦截需要安装并信任证书',
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
+          ),
+          trailing: _installed
+              ? OutlinedButton(
+                  onPressed: _showDialog,
+                  child: const Text('重新安装'),
+                )
+              : FilledButton(
+                  onPressed: _showDialog,
+                  child: const Text('安装'),
+                ),
+        ),
+      ],
     );
   }
 }

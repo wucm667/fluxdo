@@ -151,6 +151,8 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
                   ),
                 ),
                 initialSettings: WebViewSettings.visible,
+                onReceivedServerTrustAuthRequest: (_, challenge) =>
+                    WebViewSettings.handleServerTrustAuthRequest(challenge),
                 onWebViewCreated: (controller) {
                   _controller = controller;
                   // 注册 JS Handler，用于在登录按钮点击时接收凭证

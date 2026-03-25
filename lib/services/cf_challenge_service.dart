@@ -963,6 +963,8 @@ class _CfChallengePageState extends State<CfChallengePage> {
                               userAgent: AppConstants.webViewUserAgentOverride,
                               mediaPlaybackRequiresUserGesture: false,
                             ),
+                            onReceivedServerTrustAuthRequest: (_, challenge) =>
+                                WebViewSettings.handleServerTrustAuthRequest(challenge),
                             onWebViewCreated: (controller) {
                               _controller = controller;
                               // 注册 JS Handler，challenge-platform 响应到达时触发

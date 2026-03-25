@@ -16,6 +16,48 @@ import workmanager_apple
     // 注册 cookie 同步 channel，用于将 cookie 写入 HTTPCookieStorage.shared
     // WKWebView 的 sharedCookiesEnabled 在创建时从 HTTPCookieStorage.shared 读取 cookie
     if let controller = window?.rootViewController as? FlutterViewController {
+      // 注册代理 CA 证书 channel（原生层 SSL challenge 拦截）
+      let proxyCertChannel = FlutterMethodChannel(
+        name: "com.fluxdo/proxy_cert",
+        binaryMessenger: controller.binaryMessenger
+      )
+      proxyCertChannel.setMethodCallHandler { (call, result) in
+        switch call.method {
+        case "setCaCertPem":
+          guard let pem = call.arguments as? String else {
+            result(false)
+            return
+          }
+          DohProxyCertHandler.shared.setCaCertPem(pem)
+          result(true)
+        case "clear":
+          DohProxyCertHandler.shared.clearCaCert()
+          result(true)
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+
+      // 注册描述文件安装 channel
+      let profileChannel = FlutterMethodChannel(
+        name: "com.fluxdo/profile_install",
+        binaryMessenger: controller.binaryMessenger
+      )
+      profileChannel.setMethodCallHandler { [weak self] (call, result) in
+        switch call.method {
+        case "installProfile":
+          guard let mobileconfig = call.arguments as? String else {
+            result(FlutterError(code: "INVALID_ARGS", message: "Expected mobileconfig string", details: nil))
+            return
+          }
+          self?.serveMobileconfigViaSafari(mobileconfig) { success in
+            result(success)
+          }
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+
       // 注册浏览器 channel（应用链接解析与启动）
       let browserChannel = FlutterMethodChannel(
         name: "com.github.lingyan000.fluxdo/browser",
@@ -112,6 +154,98 @@ import workmanager_apple
       for cookie in cookies {
         if urlHost.hasSuffix(cookie.domain) || ".\(urlHost)".hasSuffix(cookie.domain) {
           storage.deleteCookie(cookie)
+        }
+      }
+    }
+  }
+
+  /// 启动临时 HTTP server 提供 mobileconfig 下载，然后用 Safari 打开
+  /// 全部在原生层处理，通过 beginBackgroundTask 保活
+  private func serveMobileconfigViaSafari(_ mobileconfig: String, completion: @escaping (Bool) -> Void) {
+    DispatchQueue.global(qos: .userInitiated).async {
+      // 创建 TCP socket
+      let serverSocket = socket(AF_INET, SOCK_STREAM, 0)
+      guard serverSocket >= 0 else {
+        DispatchQueue.main.async { completion(false) }
+        return
+      }
+
+      var reuse: Int32 = 1
+      setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &reuse, socklen_t(MemoryLayout<Int32>.size))
+
+      var addr = sockaddr_in()
+      addr.sin_family = sa_family_t(AF_INET)
+      addr.sin_port = 0 // 自动分配端口
+      addr.sin_addr.s_addr = inet_addr("127.0.0.1")
+      addr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+
+      let bindResult = withUnsafePointer(to: &addr) {
+        $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+          bind(serverSocket, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+        }
+      }
+      guard bindResult == 0 else {
+        close(serverSocket)
+        DispatchQueue.main.async { completion(false) }
+        return
+      }
+
+      listen(serverSocket, 1)
+
+      // 获取实际端口
+      var boundAddr = sockaddr_in()
+      var addrLen = socklen_t(MemoryLayout<sockaddr_in>.size)
+      withUnsafeMutablePointer(to: &boundAddr) {
+        $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+          getsockname(serverSocket, $0, &addrLen)
+        }
+      }
+      let port = Int(CFSwapInt16BigToHost(boundAddr.sin_port))
+
+      // 请求后台执行时间
+      var bgTask: UIBackgroundTaskIdentifier = .invalid
+      DispatchQueue.main.async {
+        bgTask = UIApplication.shared.beginBackgroundTask {
+          UIApplication.shared.endBackgroundTask(bgTask)
+          bgTask = .invalid
+        }
+      }
+
+      // 用 Safari 打开 URL
+      let url = URL(string: "http://127.0.0.1:\(port)/ca.mobileconfig")!
+      DispatchQueue.main.async {
+        UIApplication.shared.open(url, options: [:]) { _ in }
+        completion(true)
+      }
+
+      // 等待一个连接（阻塞，在后台线程）
+      let clientSocket = accept(serverSocket, nil, nil)
+      if clientSocket >= 0 {
+        // 读取请求（不解析，直接丢弃）
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        _ = recv(clientSocket, &buffer, buffer.count, 0)
+
+        // 发送 HTTP 响应
+        let body = Data(mobileconfig.utf8)
+        let header = "HTTP/1.1 200 OK\r\n" +
+          "Content-Type: application/x-apple-aspen-config\r\n" +
+          "Content-Disposition: attachment; filename=\"DOH_Proxy_CA.mobileconfig\"\r\n" +
+          "Content-Length: \(body.count)\r\n" +
+          "Connection: close\r\n\r\n"
+        _ = send(clientSocket, header, header.utf8.count, 0)
+        body.withUnsafeBytes { ptr in
+          _ = send(clientSocket, ptr.baseAddress, body.count, 0)
+        }
+        close(clientSocket)
+      }
+
+      close(serverSocket)
+
+      // 结束后台任务
+      DispatchQueue.main.async {
+        if bgTask != .invalid {
+          UIApplication.shared.endBackgroundTask(bgTask)
+          bgTask = .invalid
         }
       }
     }

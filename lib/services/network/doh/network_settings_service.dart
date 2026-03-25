@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../constants.dart';
 import '../../preloaded_data_service.dart';
 import '../doh_proxy/doh_proxy_service.dart';
+import '../doh_proxy/per_device_cert_service.dart';
 import '../proxy/proxy_settings_service.dart';
 import '../rhttp/rhttp_settings_service.dart';
 import 'doh_resolver.dart';
@@ -461,6 +462,17 @@ class NetworkSettingsService {
         _clearResolvedHostCache();
       }
 
+      // iOS: 读取 per-device CA 传给代理
+      String? caCertPem;
+      String? caKeyPem;
+      if (Platform.isIOS) {
+        final certService = PerDeviceCertService.instance;
+        if (certService.isLoaded || await certService.ensureCaCert()) {
+          caCertPem = certService.certPem;
+          caKeyPem = certService.keyPem;
+        }
+      }
+
       // Rust 代理始终为 WebView 提供 DOH/代理支持，enableDoh 不受 rhttp 影响
       final success = await _rustProxyService.start(
         preferredPort: current.proxyPort ?? 0,
@@ -476,6 +488,8 @@ class NetworkSettingsService {
         upstreamUsername: upstream.isValid ? upstream.username : null,
         upstreamPassword: upstream.isValid ? upstream.password : null,
         upstreamCipher: upstream.isValid ? upstream.cipher : null,
+        caCertPem: caCertPem,
+        caKeyPem: caKeyPem,
       );
 
       if (!success) {
@@ -563,8 +577,8 @@ class NetworkSettingsService {
 
   Future<void> _applyWebViewProxy() async {
     if (!shouldRunLocalProxy) return;
-    // macOS 14 以下调用 setProxyOverride 可能报错，保险起见判断一下
-    if (!Platform.isAndroid && !await isMacOS14OrAbove()) return;
+    // macOS 14 以下 / iOS 17 以下调用 setProxyOverride 可能报错
+    if (!Platform.isAndroid && !await isMacOS14OrAbove() && !await isiOS17OrAbove()) return;
     final port = _activeProxyPort;
     if (port == null) return;
     try {
@@ -576,16 +590,22 @@ class NetworkSettingsService {
         ),
       );
       _webViewProxySet = true;
-    } catch (_) {}
+      debugPrint('[DOH] WebView 代理已设置 -> 127.0.0.1:$port');
+    } catch (e) {
+      debugPrint('[DOH] WebView 代理设置失败: $e');
+    }
   }
 
   Future<void> _clearWebViewProxy() async {
     if (!_webViewProxySet) return;
-    if (!Platform.isAndroid && !await isMacOS14OrAbove()) return;
+    if (!Platform.isAndroid && !await isMacOS14OrAbove() && !await isiOS17OrAbove()) return;
     try {
       await inappwebview.ProxyController.instance().clearProxyOverride();
       _webViewProxySet = false;
-    } catch (_) {}
+      debugPrint('[DOH] WebView 代理已清除');
+    } catch (e) {
+      debugPrint('[DOH] WebView 代理清除失败: $e');
+    }
   }
 
   static bool? _isMacOS14OrAboveCache;
@@ -597,6 +617,17 @@ class NetworkSettingsService {
     // Darwin 23 对应 macOS 14 (Sonoma)
     _isMacOS14OrAboveCache = info.majorVersion >= 23;
     return _isMacOS14OrAboveCache!;
+  }
+
+  static bool? _isiOS17OrAboveCache;
+
+  Future<bool> isiOS17OrAbove() async {
+    if (!Platform.isIOS) return false;
+    if (_isiOS17OrAboveCache != null) return _isiOS17OrAboveCache!;
+    final info = await DeviceInfoPlugin().iosInfo;
+    final major = int.tryParse(info.systemVersion.split('.').first) ?? 0;
+    _isiOS17OrAboveCache = major >= 17;
+    return _isiOS17OrAboveCache!;
   }
 
   void _touch() {

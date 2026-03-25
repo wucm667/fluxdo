@@ -9,6 +9,7 @@ import '../../../../utils/layout_lock.dart';
 import '../../../../utils/url_helper.dart';
 import '../../../../pages/webview_page.dart';
 import '../../../../l10n/s.dart';
+import '../../../../services/webview_settings.dart';
 import '../../../../services/windows_webview_environment_service.dart';
 
 /// 是否需要交互遮罩（macOS 上 WebView 会捕获滚动事件）
@@ -253,6 +254,8 @@ class _IframeWidgetState extends State<IframeWidget> {
                   },
                 ),
                 initialSettings: _buildSettings(attrs),
+                onReceivedServerTrustAuthRequest: (_, challenge) =>
+                    WebViewSettings.handleServerTrustAuthRequest(challenge),
                 // 允许 WebView 接收水平滑动手势
                 gestureRecognizers: {
                   Factory<HorizontalDragGestureRecognizer>(

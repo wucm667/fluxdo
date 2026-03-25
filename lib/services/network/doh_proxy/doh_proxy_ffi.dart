@@ -1,11 +1,9 @@
-import 'package:flutter/foundation.dart';
-
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart';
 
 class DohHostLookupResult {
   const DohHostLookupResult({
@@ -34,36 +32,37 @@ class DohProxyFfi {
   DynamicLibrary? _lib;
   bool _initialized = false;
 
-  // FFI function types
-  late final int Function(Pointer<Utf8> configJson) _dohProxyStartWithConfigJson;
-  late final void Function() _dohProxyStop;
-  late final int Function() _dohProxyIsRunning;
-  late final int Function() _dohProxyGetPort;
-  late final void Function() _dohProxyInitLogging;
-  late final Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>) _dohProxyLookupEchConfig;
-  late final Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, int) _dohProxyLookupIp;
-  late final Pointer<Utf8> Function(
+  // FFI function types（使用 late 而非 late final，允许重新初始化）
+  late int Function(Pointer<Utf8> configJson) _dohProxyStartWithConfigJson;
+  late void Function() _dohProxyStop;
+  late int Function() _dohProxyIsRunning;
+  late int Function() _dohProxyGetPort;
+  late void Function() _dohProxyInitLogging;
+  late Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>) _dohProxyLookupEchConfig;
+  late Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, int) _dohProxyLookupIp;
+  late Pointer<Utf8> Function(
     Pointer<Utf8>,
     Pointer<Utf8>,
     Pointer<Utf8>,
     int,
     int,
   ) _dohProxyLookupHost;
-  late final int Function() _dohProxyClearDnsCache;
-  late final int Function(
+  late int Function() _dohProxyClearDnsCache;
+  late int Function(
     Pointer<Utf8>,
     Pointer<Utf8>,
     Pointer<Utf8>,
     int,
     Pointer<Utf8>,
   ) _dohProxyRecordHostSuccess;
-  late final int Function(
+  late int Function(
     Pointer<Utf8>,
     Pointer<Utf8>,
     Pointer<Utf8>,
     int,
   ) _dohProxyClearPreferredHostIp;
-  late final void Function(Pointer<Utf8>) _dohProxyFreeString;
+  Pointer<Utf8> Function()? _dohProxyGenerateCa;
+  late void Function(Pointer<Utf8>) _dohProxyFreeString;
 
   /// Initialize FFI bindings
   bool initialize() {
@@ -147,6 +146,16 @@ class DohProxyFfi {
                     Int32,
                   )>>('doh_proxy_clear_preferred_host_ip')
           .asFunction();
+
+      // doh_proxy_generate_ca 是新增符号，旧版本库可能没有，可选绑定
+      try {
+        _dohProxyGenerateCa = _lib!
+            .lookup<NativeFunction<Pointer<Utf8> Function()>>('doh_proxy_generate_ca')
+            .asFunction();
+      } catch (_) {
+        _dohProxyGenerateCa = null;
+        debugPrint('[DOH FFI] doh_proxy_generate_ca 未找到，per-device CA 不可用');
+      }
 
       _dohProxyFreeString = _lib!
           .lookup<NativeFunction<Void Function(Pointer<Utf8>)>>('doh_proxy_free_string')
@@ -238,6 +247,8 @@ class DohProxyFfi {
     String? upstreamUsername,
     String? upstreamPassword,
     String? upstreamCipher,
+    String? caCertPem,
+    String? caKeyPem,
   }) {
     if (!_initialized && !initialize()) {
       return -1;
@@ -248,6 +259,7 @@ class DohProxyFfi {
       'bind_port': port,
       'enable_doh': enableDoh,
       'gateway_mode': gatewayMode,
+      'mitm_connect': true,
       'doh_server': dohServer ?? 'cloudflare',
       'prefer_ipv6': preferIpv6,
       'timeout_secs': 30,
@@ -267,6 +279,10 @@ class DohProxyFfi {
           if (upstreamPassword != null && upstreamPassword.isNotEmpty)
             'password': upstreamPassword,
         },
+      if (caCertPem != null && caCertPem.isNotEmpty)
+        'ca_cert_pem': caCertPem,
+      if (caKeyPem != null && caKeyPem.isNotEmpty)
+        'ca_key_pem': caKeyPem,
     });
     final configPtr = configJson.toNativeUtf8();
     try {
@@ -274,6 +290,31 @@ class DohProxyFfi {
     } finally {
       calloc.free(configPtr);
     }
+  }
+
+  /// 生成新的 CA 证书，返回 (certPem, keyPem)，失败返回 null
+  ({String certPem, String keyPem})? generateCa() {
+    if (!_initialized && !initialize()) return null;
+    final fn = _dohProxyGenerateCa;
+    if (fn == null) return null;
+
+    final resultPtr = fn();
+    if (resultPtr == nullptr) return null;
+
+    final jsonStr = resultPtr.toDartString();
+    _dohProxyFreeString(resultPtr);
+
+    final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+    if (map['ok'] == true &&
+        map['cert_pem'] is String &&
+        map['key_pem'] is String) {
+      return (
+        certPem: map['cert_pem'] as String,
+        keyPem: map['key_pem'] as String,
+      );
+    }
+    debugPrint('[DOH FFI] generateCa: ${map['error'] ?? 'unknown error'}');
+    return null;
   }
 
   /// Lookup ECH config for a host via DOH DNS HTTPS record.

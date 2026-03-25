@@ -69,6 +69,8 @@ class DohProxyService {
     String? upstreamUsername,
     String? upstreamPassword,
     String? upstreamCipher,
+    String? caCertPem,
+    String? caKeyPem,
   }) async {
     final upstreamSignature = _buildUpstreamSignature(
       protocol: upstreamProtocol,
@@ -113,6 +115,8 @@ class DohProxyService {
         upstreamUsername,
         upstreamPassword,
         upstreamCipher,
+        caCertPem,
+        caKeyPem,
       );
       // 桌面平台 FFI 加载失败时，回退到进程模式
       if (!result && DohProxyFfi.canFallbackToProcess) {
@@ -169,6 +173,8 @@ class DohProxyService {
     String? upstreamUsername,
     String? upstreamPassword,
     String? upstreamCipher,
+    String? caCertPem,
+    String? caKeyPem,
   ) async {
     try {
       return await _enqueueFfiOp(() async {
@@ -192,6 +198,8 @@ class DohProxyService {
           upstreamUsername: upstreamUsername,
           upstreamPassword: upstreamPassword,
           upstreamCipher: upstreamCipher,
+          caCertPem: caCertPem,
+          caKeyPem: caKeyPem,
         );
         if (resultPort <= 0) {
           // _callFfiStart 已设置更详细的 _lastError，仅在未设置时补充
@@ -490,6 +498,28 @@ class DohProxyService {
     return null;
   }
 
+  /// 生成新的 CA 证书（仅 FFI 可用时）
+  Future<({String certPem, String keyPem})?> generateCa() async {
+    if (!DohProxyFfi.isAvailable) return null;
+    return _enqueueFfiOp(() async {
+      final sendPort = await _ensureFfiIsolate();
+      final response = ReceivePort();
+      sendPort.send({
+        'cmd': 'generate_ca',
+        'replyTo': response.sendPort,
+      });
+      final result = await response.first;
+      response.close();
+      if (result is Map && result['ok'] == true) {
+        return (
+          certPem: result['certPem'] as String,
+          keyPem: result['keyPem'] as String,
+        );
+      }
+      return null;
+    });
+  }
+
   Future<Uint8List?> lookupEchConfig(String host, String dohServer) async {
     if (!DohProxyFfi.isAvailable) {
       return DohProxyFfi.instance.lookupEchConfig(host, dohServer);
@@ -631,6 +661,8 @@ class DohProxyService {
     required String? upstreamUsername,
     required String? upstreamPassword,
     required String? upstreamCipher,
+    String? caCertPem,
+    String? caKeyPem,
   }) async {
     final sendPort = await _ensureFfiIsolate();
     final response = ReceivePort();
@@ -649,6 +681,8 @@ class DohProxyService {
       'upstreamUsername': upstreamUsername,
       'upstreamPassword': upstreamPassword,
       'upstreamCipher': upstreamCipher,
+      'caCertPem': caCertPem,
+      'caKeyPem': caKeyPem,
       'preferredPort': port,
       'replyTo': response.sendPort,
     });
@@ -909,6 +943,8 @@ void _ffiIsolateEntry(SendPort mainSendPort) {
           final upstreamUsername = message['upstreamUsername'] as String?;
           final upstreamPassword = message['upstreamPassword'] as String?;
           final upstreamCipher = message['upstreamCipher'] as String?;
+          final caCertPem = message['caCertPem'] as String?;
+          final caKeyPem = message['caKeyPem'] as String?;
           var resultPort = DohProxyFfi.instance.start(
             port: portValue,
             enableDoh: enableDoh,
@@ -923,6 +959,8 @@ void _ffiIsolateEntry(SendPort mainSendPort) {
             upstreamUsername: upstreamUsername,
             upstreamPassword: upstreamPassword,
             upstreamCipher: upstreamCipher,
+            caCertPem: caCertPem,
+            caKeyPem: caKeyPem,
           );
           if (resultPort <= 0 && preferredPort != 0) {
             resultPort = DohProxyFfi.instance.start(
@@ -939,6 +977,8 @@ void _ffiIsolateEntry(SendPort mainSendPort) {
               upstreamUsername: upstreamUsername,
               upstreamPassword: upstreamPassword,
               upstreamCipher: upstreamCipher,
+              caCertPem: caCertPem,
+              caKeyPem: caKeyPem,
             );
           }
           if (resultPort <= 0) {
@@ -1015,6 +1055,18 @@ void _ffiIsolateEntry(SendPort mainSendPort) {
                     'ttl_ms': result.ttl.inMilliseconds,
                   },
           });
+          return;
+        case 'generate_ca':
+          final result = DohProxyFfi.instance.generateCa();
+          if (result != null) {
+            replyTo.send({
+              'ok': true,
+              'certPem': result.certPem,
+              'keyPem': result.keyPem,
+            });
+          } else {
+            replyTo.send({'ok': false, 'error': 'generate_ca failed'});
+          }
           return;
         case 'clear_dns_cache':
           final ok = DohProxyFfi.instance.clearDnsCache();

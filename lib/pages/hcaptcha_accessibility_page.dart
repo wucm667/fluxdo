@@ -60,6 +60,8 @@ class _HCaptchaAccessibilityPageState extends State<HCaptchaAccessibilityPage> {
                   url: WebUri('https://www.hcaptcha.com/accessibility'),
                 ),
                 initialSettings: WebViewSettings.visible,
+                onReceivedServerTrustAuthRequest: (_, challenge) =>
+                    WebViewSettings.handleServerTrustAuthRequest(challenge),
                 onWebViewCreated: (controller) {
                   _controller = controller;
                 },

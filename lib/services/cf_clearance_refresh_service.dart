@@ -9,6 +9,7 @@ import '../constants.dart';
 import 'cf_challenge_logger.dart';
 import 'network/cookie/cookie_jar_service.dart';
 import 'network/discourse_dio.dart';
+import 'webview_settings.dart';
 import 'windows_webview_environment_service.dart';
 
 /// cf_clearance 自动续期服务
@@ -219,6 +220,8 @@ class CfClearanceRefreshService {
         javaScriptEnabled: true,
         userAgent: AppConstants.webViewUserAgentOverride,
       ),
+      onReceivedServerTrustAuthRequest: (_, challenge) =>
+          WebViewSettings.handleServerTrustAuthRequest(challenge),
       onWebViewCreated: (controller) {
         if (!_canHandleGeneration(gen)) {
           CfChallengeLogger.log(
