@@ -237,6 +237,7 @@ class _WebViewPageState extends ConsumerState<WebViewPage> {
                             : null,
                     initialSettings: WebViewSettings.visible
                       ..useShouldOverrideUrlLoading = true,
+                    initialUserScripts: WebViewSettings.ios15PolyfillScripts,
                     shouldOverrideUrlLoading: _shouldOverrideUrlLoading,
                     onReceivedServerTrustAuthRequest: (_, challenge) =>
                         WebViewSettings.handleServerTrustAuthRequest(challenge),
