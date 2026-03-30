@@ -9,7 +9,6 @@ import '../widgets/topic/topic_list_skeleton.dart';
 import '../widgets/topic/sort_and_tags_bar.dart';
 import '../widgets/topic/topic_item_builder.dart';
 import '../widgets/common/error_view.dart';
-import '../widgets/layout/master_detail_layout.dart';
 import 'topic_detail_page/topic_detail_page.dart';
 import 'search_page.dart';
 import '../models/search_filter.dart';
@@ -201,24 +200,14 @@ class _TagTopicsPageState extends ConsumerState<TagTopicsPage> {
   }
 
   Future<void> _openTopic(Topic topic) async {
-    final canShowDetailPane = MasterDetailLayout.canShowBothPanesFor(context);
-
-    if (canShowDetailPane) {
-      ref.read(selectedTopicProvider.notifier).select(
-        topicId: topic.id,
-        initialTitle: topic.title,
-        scrollToPostNumber: topic.lastReadPostNumber,
-      );
-      return;
-    }
-
+    // 标签详情页是独立 push 的页面，不在首页 MasterDetailLayout 内，
+    // 始终 push 全屏详情页，禁用 autoSwitchToMasterDetail 防止双栏模式下自动 pop。
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => TopicDetailPage(
           topicId: topic.id,
           initialTitle: topic.title,
           scrollToPostNumber: topic.lastReadPostNumber,
-          autoSwitchToMasterDetail: true,
         ),
       ),
     );
