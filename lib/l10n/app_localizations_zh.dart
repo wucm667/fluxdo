@@ -4108,6 +4108,24 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get oauth_getAuthUrlFailed => '获取授权链接失败';
+
+  @override
+  String get oauth_approvePageParseFailed => '授权页面解析失败，请确认已登录论坛';
+
+  @override
+  String get oauth_noRedirectResponse => '授权服务未返回重定向';
+
+  @override
+  String get oauth_missingParams => '授权回调缺少必要参数';
+
+  @override
+  String get oauth_callbackFailed => '授权回调失败';
+
+  @override
+  String get oauth_networkError => '网络请求失败，请检查网络连接';
+
+  @override
   String get metaverse_ldcService => 'LDC 积分服务';
 
   @override
@@ -9733,6 +9751,24 @@ class AppLocalizationsZhHk extends AppLocalizationsZh {
   }
 
   @override
+  String get oauth_getAuthUrlFailed => '獲取授權連結失敗';
+
+  @override
+  String get oauth_approvePageParseFailed => '授權頁面解析失敗，請確認已登入論壇';
+
+  @override
+  String get oauth_noRedirectResponse => '授權服務未返回重定向';
+
+  @override
+  String get oauth_missingParams => '授權回調缺少必要參數';
+
+  @override
+  String get oauth_callbackFailed => '授權回調失敗';
+
+  @override
+  String get oauth_networkError => '網絡請求失敗，請檢查網絡連接';
+
+  @override
   String get metaverse_ldcService => 'LDC 積分服務';
 
   @override
@@ -15235,6 +15271,24 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String metaverse_authFailed(String error) {
     return '授權失敗: $error';
   }
+
+  @override
+  String get oauth_getAuthUrlFailed => '獲取授權連結失敗';
+
+  @override
+  String get oauth_approvePageParseFailed => '授權頁面解析失敗，請確認已登入論壇';
+
+  @override
+  String get oauth_noRedirectResponse => '授權服務未返回重定向';
+
+  @override
+  String get oauth_missingParams => '授權回調缺少必要參數';
+
+  @override
+  String get oauth_callbackFailed => '授權回調失敗';
+
+  @override
+  String get oauth_networkError => '網路請求失敗，請檢查網路連線';
 
   @override
   String get metaverse_ldcService => 'LDC 積分服務';

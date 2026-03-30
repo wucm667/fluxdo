@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../constants.dart';
 import 'network/cookie/cookie_jar_service.dart';
 import 'network/cookie/android_cdp_feature.dart';
 
@@ -99,11 +100,24 @@ class MigrationService {
       },
     ),
     // v4: storageKey 放宽（去掉 hostOnly）— 清理旧 cookie 防止多副本残留
+    // 只要不是全新安装就清除（游客也可能有残留重复 cookie）
     Migration(
       key: 'cookie_relaxed_key_v4',
       name: 'Relaxed storageKey migration',
       shouldRun: (prefs) async {
-        return prefs.getString('linux_do_username')?.isNotEmpty == true;
+        // 有任何旧迁移标记 = 非全新安装
+        if (_hasLegacyCookieMigrationMarker(prefs)) return true;
+        // jar 中有 cookie = 非全新安装
+        try {
+          final jar = CookieJarService();
+          if (!jar.isInitialized) await jar.initialize();
+          final cookies = await jar.cookieJar.loadForRequest(
+            Uri.parse(AppConstants.baseUrl),
+          );
+          return cookies.isNotEmpty;
+        } catch (_) {
+          return false;
+        }
       },
       run: () async {
         final jar = CookieJarService();

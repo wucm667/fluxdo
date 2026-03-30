@@ -4183,6 +4183,28 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get oauth_getAuthUrlFailed => 'Failed to get authorization URL';
+
+  @override
+  String get oauth_approvePageParseFailed =>
+      'Failed to parse authorization page, please ensure you are logged in';
+
+  @override
+  String get oauth_noRedirectResponse =>
+      'Authorization service did not return a redirect';
+
+  @override
+  String get oauth_missingParams =>
+      'Authorization callback missing required parameters';
+
+  @override
+  String get oauth_callbackFailed => 'Authorization callback failed';
+
+  @override
+  String get oauth_networkError =>
+      'Network request failed, please check your connection';
+
+  @override
   String get metaverse_ldcService => 'LDC Points Service';
 
   @override

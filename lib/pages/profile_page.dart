@@ -216,10 +216,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       // 忽略登出错误
     }
     if (!mounted) return;
-    final result = await service.authorize(context);
-    if (result && mounted) {
-      ref.read(ldcUserInfoProvider.notifier).refresh();
-      ToastService.showSuccess(S.current.profile_ldcReauthSuccess);
+    try {
+      final result = await service.authorize(context);
+      if (result && mounted) {
+        ref.read(ldcUserInfoProvider.notifier).refresh();
+        ToastService.showSuccess(S.current.profile_ldcReauthSuccess);
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastService.showError(S.current.metaverse_authFailed(e.toString()));
+      }
     }
   }
 
@@ -231,10 +237,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       // 忽略登出错误
     }
     if (!mounted) return;
-    final result = await service.authorize(context);
-    if (result && mounted) {
-      ref.read(cdkUserInfoProvider.notifier).refresh();
-      ToastService.showSuccess(S.current.profile_cdkReauthSuccess);
+    try {
+      final result = await service.authorize(context);
+      if (result && mounted) {
+        ref.read(cdkUserInfoProvider.notifier).refresh();
+        ToastService.showSuccess(S.current.profile_cdkReauthSuccess);
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastService.showError(S.current.metaverse_authFailed(e.toString()));
+      }
     }
   }
 

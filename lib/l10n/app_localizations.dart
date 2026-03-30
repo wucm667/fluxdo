@@ -7631,6 +7631,42 @@ abstract class AppLocalizations {
   /// **'授权失败: {error}'**
   String metaverse_authFailed(String error);
 
+  /// No description provided for @oauth_getAuthUrlFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'获取授权链接失败'**
+  String get oauth_getAuthUrlFailed;
+
+  /// No description provided for @oauth_approvePageParseFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'授权页面解析失败，请确认已登录论坛'**
+  String get oauth_approvePageParseFailed;
+
+  /// No description provided for @oauth_noRedirectResponse.
+  ///
+  /// In zh, this message translates to:
+  /// **'授权服务未返回重定向'**
+  String get oauth_noRedirectResponse;
+
+  /// No description provided for @oauth_missingParams.
+  ///
+  /// In zh, this message translates to:
+  /// **'授权回调缺少必要参数'**
+  String get oauth_missingParams;
+
+  /// No description provided for @oauth_callbackFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'授权回调失败'**
+  String get oauth_callbackFailed;
+
+  /// No description provided for @oauth_networkError.
+  ///
+  /// In zh, this message translates to:
+  /// **'网络请求失败，请检查网络连接'**
+  String get oauth_networkError;
+
   /// No description provided for @metaverse_ldcService.
   ///
   /// In zh, this message translates to:

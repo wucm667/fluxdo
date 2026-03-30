@@ -2458,6 +2458,12 @@
       }
     }
   },
+  "oauth_getAuthUrlFailed": "獲取授權連結失敗",
+  "oauth_approvePageParseFailed": "授權頁面解析失敗，請確認已登入論壇",
+  "oauth_noRedirectResponse": "授權服務未返回重定向",
+  "oauth_missingParams": "授權回調缺少必要參數",
+  "oauth_callbackFailed": "授權回調失敗",
+  "oauth_networkError": "網路請求失敗，請檢查網路連線",
   "metaverse_ldcService": "LDC 積分服務",
   "metaverse_ldcDesc": "連線賬戶，開啟積分權益",
   "metaverse_cdkService": "CDK 服務",
