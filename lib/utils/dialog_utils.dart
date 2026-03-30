@@ -1,22 +1,75 @@
-import 'dart:ui';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/preferences_provider.dart';
+import 'blur_config.dart';
+import 'responsive.dart';
 
-/// 对话框背景模糊滤镜
-final _blurFilter = ImageFilter.blur(
-  sigmaX: 10,
-  sigmaY: 10,
-  tileMode: TileMode.mirror,
-);
-
-/// 根据用户偏好获取模糊滤镜
-ImageFilter? _getBlurFilter(BuildContext context) {
+/// 根据用户偏好判断是否启用模糊
+bool _isBlurEnabled(BuildContext context) {
   final container = ProviderScope.containerOf(context, listen: false);
   final prefs = container.read(preferencesProvider);
-  return prefs.dialogBlur ? _blurFilter : null;
+  return prefs.dialogBlur;
+}
+
+/// 构建带动画模糊效果的遮罩层
+///
+/// 模糊强度跟随路由动画渐变，并叠加饱和度增强，
+/// 实现类似 Telegram 的平滑模糊过渡。
+///
+/// macOS/Windows acrylic 模式下 NavigationRail 背景透明，
+/// BackdropFilter 对其模糊效果异常，因此跳过该区域并补 surface 底色。
+Widget _buildAnimatedBlurBarrier({
+  required Widget barrier,
+  required Animation<double> animation,
+}) {
+  final hasAcrylicRail = Platform.isMacOS || Platform.isWindows;
+
+  return AnimatedBuilder(
+    animation: animation,
+    builder: (context, child) {
+      final t = animation.value;
+      if (t == 0) return child!;
+
+      final sigma = (blurSigma * t).clamp(0.01, blurSigma);
+      final filter = createBlurFilter(sigma);
+
+      // acrylic 模式下 NavigationRail 背景透明，需跳过并补底
+      final showRail = hasAcrylicRail && Responsive.showNavigationRail(context);
+      if (showRail) {
+        const railWidth = 72.0;
+        return Stack(
+          children: [
+            // Rail 区域：surfaceDim 底色填充
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: railWidth,
+              child: ColoredBox(
+                color: Theme.of(context).colorScheme.surfaceDim,
+              ),
+            ),
+            // Body 区域：模糊
+            Positioned.fill(
+              left: railWidth,
+              child: BackdropFilter(
+                filter: filter,
+                child: const SizedBox.expand(),
+              ),
+            ),
+            // 原始 barrier（遮罩颜色 + 手势 + 无障碍）
+            child!,
+          ],
+        );
+      }
+
+      return BackdropFilter(filter: filter, child: child);
+    },
+    child: barrier,
+  );
 }
 
 /// 替代 [showDialog]，自动根据用户偏好添加背景高斯模糊。
@@ -33,7 +86,7 @@ Future<T?> showAppDialog<T>({
   RouteSettings? routeSettings,
   bool blur = true,
 }) {
-  final filter = blur ? _getBlurFilter(context) : null;
+  final enableBlur = blur && _isBlurEnabled(context);
 
   final themes = InheritedTheme.capture(
     from: context,
@@ -47,14 +100,17 @@ Future<T?> showAppDialog<T>({
         return themes.wrap(SafeArea(child: pageChild));
       },
       barrierDismissible: barrierDismissible,
-      barrierColor: barrierColor ?? Colors.black54,
+      barrierColor: barrierColor ??
+          (enableBlur
+              ? blurBarrierColor(Theme.of(context).brightness)
+              : Colors.black54),
       barrierLabel:
           barrierLabel ??
           MaterialLocalizations.of(context).modalBarrierDismissLabel,
       transitionDuration: const Duration(milliseconds: 150),
       transitionBuilder: _buildMaterialDialogTransitions,
       settings: routeSettings,
-      filter: filter,
+      enableBlur: enableBlur,
     ),
   );
 }
@@ -65,25 +121,28 @@ Future<T?> showAppGeneralDialog<T extends Object?>({
   required RoutePageBuilder pageBuilder,
   bool barrierDismissible = false,
   String? barrierLabel,
-  Color barrierColor = const Color(0x80000000),
+  Color? barrierColor,
   Duration transitionDuration = const Duration(milliseconds: 200),
   RouteTransitionsBuilder? transitionBuilder,
   bool useRootNavigator = true,
   RouteSettings? routeSettings,
   bool blur = true,
 }) {
-  final filter = blur ? _getBlurFilter(context) : null;
+  final enableBlur = blur && _isBlurEnabled(context);
 
   return Navigator.of(context, rootNavigator: useRootNavigator).push<T>(
     _BlurRawDialogRoute<T>(
       pageBuilder: pageBuilder,
       barrierDismissible: barrierDismissible,
       barrierLabel: barrierLabel,
-      barrierColor: barrierColor,
+      barrierColor: barrierColor ??
+          (enableBlur
+              ? blurBarrierColor(Theme.of(context).brightness)
+              : const Color(0x80000000)),
       transitionDuration: transitionDuration,
       transitionBuilder: transitionBuilder,
       settings: routeSettings,
-      filter: filter,
+      enableBlur: enableBlur,
     ),
   );
 }
@@ -124,7 +183,7 @@ Future<T?> showAppBottomSheet<T>({
   AnimationStyle? sheetAnimationStyle,
   bool blur = true,
 }) {
-  final blurFilter = blur ? _getBlurFilter(context) : null;
+  final enableBlur = blur && _isBlurEnabled(context);
   final NavigatorState navigator =
       Navigator.of(context, rootNavigator: useRootNavigator);
 
@@ -139,9 +198,10 @@ Future<T?> showAppBottomSheet<T>({
       barrierLabel:
           barrierLabel ??
           MaterialLocalizations.of(context).modalBarrierDismissLabel,
-      modalBarrierColor:
-          barrierColor ??
-          Theme.of(context).bottomSheetTheme.modalBarrierColor,
+      modalBarrierColor: barrierColor ??
+          (enableBlur
+              ? blurBarrierColor(Theme.of(context).brightness)
+              : Theme.of(context).bottomSheetTheme.modalBarrierColor),
       isDismissible: isDismissible,
       enableDrag: enableDrag,
       showDragHandle: showDragHandle,
@@ -155,14 +215,14 @@ Future<T?> showAppBottomSheet<T>({
       anchorPoint: anchorPoint,
       useSafeArea: useSafeArea,
       sheetAnimationStyle: sheetAnimationStyle,
-      blurFilter: blurFilter,
+      enableBlur: enableBlur,
     ),
   );
 }
 
-/// 支持 filter 的 ModalBottomSheetRoute 子类
+/// 支持动画模糊的 ModalBottomSheetRoute 子类
 class _BlurModalBottomSheetRoute<T> extends ModalBottomSheetRoute<T> {
-  final ImageFilter? blurFilter;
+  final bool enableBlur;
 
   _BlurModalBottomSheetRoute({
     required super.builder,
@@ -183,20 +243,21 @@ class _BlurModalBottomSheetRoute<T> extends ModalBottomSheetRoute<T> {
     super.anchorPoint,
     super.useSafeArea,
     super.sheetAnimationStyle,
-    this.blurFilter,
+    this.enableBlur = false,
   });
 
   @override
   Widget buildModalBarrier() {
     final barrier = super.buildModalBarrier();
-    if (blurFilter != null) {
-      return BackdropFilter(filter: blurFilter!, child: barrier);
-    }
-    return barrier;
+    if (!enableBlur) return barrier;
+    return _buildAnimatedBlurBarrier(
+      barrier: barrier,
+      animation: animation!,
+    );
   }
 }
 
-/// 支持 filter 的 RawDialogRoute 替代
+/// 支持动画模糊的 RawDialogRoute 替代
 class _BlurRawDialogRoute<T> extends PopupRoute<T> {
   final RoutePageBuilder pageBuilder;
   final bool _barrierDismissible;
@@ -204,6 +265,7 @@ class _BlurRawDialogRoute<T> extends PopupRoute<T> {
   final Color _barrierColor;
   final Duration _transitionDuration;
   final RouteTransitionsBuilder? _transitionBuilder;
+  final bool enableBlur;
 
   _BlurRawDialogRoute({
     required this.pageBuilder,
@@ -213,7 +275,7 @@ class _BlurRawDialogRoute<T> extends PopupRoute<T> {
     required Duration transitionDuration,
     RouteTransitionsBuilder? transitionBuilder,
     super.settings,
-    super.filter,
+    this.enableBlur = false,
   })  : _barrierDismissible = barrierDismissible,
         _barrierLabel = barrierLabel,
         _barrierColor = barrierColor,
@@ -249,11 +311,21 @@ class _BlurRawDialogRoute<T> extends PopupRoute<T> {
     Widget child,
   ) {
     if (_transitionBuilder != null) {
-      return _transitionBuilder!(context, animation, secondaryAnimation, child);
+      return _transitionBuilder(context, animation, secondaryAnimation, child);
     }
     return FadeTransition(
       opacity: CurvedAnimation(parent: animation, curve: Curves.linear),
       child: child,
+    );
+  }
+
+  @override
+  Widget buildModalBarrier() {
+    final barrier = super.buildModalBarrier();
+    if (!enableBlur) return barrier;
+    return _buildAnimatedBlurBarrier(
+      barrier: barrier,
+      animation: animation!,
     );
   }
 }

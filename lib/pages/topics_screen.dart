@@ -1,4 +1,4 @@
-import 'dart:ui';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +8,8 @@ import '../l10n/s.dart';
 import '../providers/preferences_provider.dart';
 import '../providers/selected_topic_provider.dart';
 import '../providers/discourse_providers.dart';
+import '../utils/blur_config.dart';
+import '../utils/responsive.dart';
 import '../widgets/layout/master_detail_layout.dart';
 import 'topics_page.dart';
 import 'topic_detail_page/topic_detail_page.dart';
@@ -265,37 +267,69 @@ class _TopicsFabState extends ConsumerState<_TopicsFab>
     final dialogBlur = ProviderScope.containerOf(context, listen: false)
         .read(preferencesProvider)
         .dialogBlur;
+
+    // 桌面 acrylic 模式下 NavigationRail 背景透明，
+    // BackdropFilter 对其模糊效果异常，需跳过该区域
+    final showRail = Responsive.showNavigationRail(context);
+    final hasAcrylic = Platform.isMacOS || Platform.isWindows;
+    final blurLeftInset = (showRail && hasAcrylic) ? 72.0 : 0.0;
+    final barrierColor = dialogBlur
+        ? blurBarrierColor(Theme.of(context).brightness)
+        : Colors.black26;
+
     _overlayEntry = OverlayEntry(
       builder: (context) => Stack(
         children: [
-          // 全屏遮罩
+          // 全屏暗色遮罩 + 点击关闭
           GestureDetector(
             onTap: _close,
             behavior: HitTestBehavior.opaque,
             child: FadeTransition(
               opacity: _expandAnimation,
-              child: dialogBlur
-                  ? AnimatedBuilder(
-                      animation: _expandAnimation,
-                      builder: (context, child) => BackdropFilter(
-                        filter: ImageFilter.blur(
-                          sigmaX: 10 * _expandAnimation.value,
-                          sigmaY: 10 * _expandAnimation.value,
-                          tileMode: TileMode.mirror,
-                        ),
-                        child: child,
-                      ),
-                      child: const ColoredBox(
-                        color: Colors.black26,
-                        child: SizedBox.expand(),
-                      ),
-                    )
-                  : const ColoredBox(
-                      color: Colors.black26,
-                      child: SizedBox.expand(),
-                    ),
+              child: ColoredBox(
+                color: barrierColor,
+                child: const SizedBox.expand(),
+              ),
             ),
           ),
+          // NavigationRail 补底：acrylic 模式下 Rail 背景透明，
+          // 用 surface 色填充使遮罩可见
+          if (dialogBlur && blurLeftInset > 0)
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: blurLeftInset,
+              child: IgnorePointer(
+                child: FadeTransition(
+                  opacity: _expandAnimation,
+                  child: ColoredBox(
+                    color: Theme.of(context).colorScheme.surfaceDim,
+                  ),
+                ),
+              ),
+            ),
+          // 模糊层：覆盖 body 区域（跳过透明的 NavigationRail）
+          if (dialogBlur)
+            Positioned.fill(
+              left: blurLeftInset,
+              child: IgnorePointer(
+                child: AnimatedBuilder(
+                  animation: _expandAnimation,
+                  builder: (context, child) {
+                    final t = _expandAnimation.value;
+                    if (t == 0) return child!;
+                    return BackdropFilter(
+                      filter: createBlurFilter(
+                        (blurSigma * t).clamp(0.01, blurSigma),
+                      ),
+                      child: child,
+                    );
+                  },
+                  child: const SizedBox.expand(),
+                ),
+              ),
+            ),
           // 主 FAB 副本（在模糊层之上，保持清晰）
           if (dialogBlur)
             CompositedTransformFollower(

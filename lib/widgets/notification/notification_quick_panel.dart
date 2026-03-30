@@ -1,11 +1,10 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/s.dart';
 import '../../providers/discourse_providers.dart';
 import '../../providers/preferences_provider.dart';
 import '../../pages/notifications_page.dart';
+import '../../utils/blur_config.dart';
 import '../../utils/responsive.dart';
 import '../../utils/notification_navigation.dart';
 import 'notification_item.dart';
@@ -139,6 +138,9 @@ class _SidebarNotificationPanelState extends State<SidebarNotificationPanel>
         final dialogBlur = ProviderScope.containerOf(context, listen: false)
             .read(preferencesProvider)
             .dialogBlur;
+        final barrierColor = dialogBlur
+            ? blurBarrierColor(Theme.of(context).brightness)
+            : Colors.black26;
 
         final panel = Material(
           color: Theme.of(context).colorScheme.surface,
@@ -167,14 +169,14 @@ class _SidebarNotificationPanelState extends State<SidebarNotificationPanel>
         );
 
         return showRail
-            ? _buildSidebarLayout(panel, dialogBlur)
-            : _buildMobileLayout(panel, dialogBlur);
+            ? _buildSidebarLayout(panel, dialogBlur, barrierColor)
+            : _buildMobileLayout(panel, dialogBlur, barrierColor);
       },
     );
   }
 
   /// 侧栏模式：从左边缘滑出
-  Widget _buildSidebarLayout(Widget child, bool blur) {
+  Widget _buildSidebarLayout(Widget child, bool blur, Color barrierColor) {
     final screenSize = MediaQuery.sizeOf(context);
     const panelWidth = 420.0;
     final panelHeight = (screenSize.height * 0.9).clamp(0.0, 900.0);
@@ -197,10 +199,8 @@ class _SidebarNotificationPanelState extends State<SidebarNotificationPanel>
             child: ClipPath(
               clipper: _ExcludeRectClipper(panelRect),
               child: BackdropFilter(
-                filter: ImageFilter.blur(
-                  sigmaX: 10 * _animation.value,
-                  sigmaY: 10 * _animation.value,
-                  tileMode: TileMode.mirror,
+                filter: createBlurFilter(
+                  (blurSigma * _animation.value).clamp(0.01, blurSigma),
                 ),
                 child: const SizedBox.expand(),
               ),
@@ -211,7 +211,7 @@ class _SidebarNotificationPanelState extends State<SidebarNotificationPanel>
           child: GestureDetector(
             onTap: NotificationQuickPanel.dismiss,
             child: ColoredBox(
-              color: Colors.black.withValues(alpha: 0.3 * _animation.value),
+              color: barrierColor.withValues(alpha: barrierColor.a * _animation.value),
             ),
           ),
         ),
@@ -232,7 +232,7 @@ class _SidebarNotificationPanelState extends State<SidebarNotificationPanel>
   }
 
   /// 手机模式：从底部滑出 + 下滑关闭
-  Widget _buildMobileLayout(Widget child, bool blur) {
+  Widget _buildMobileLayout(Widget child, bool blur, Color barrierColor) {
     final screenSize = MediaQuery.sizeOf(context);
     final panelHeight = screenSize.height * 0.8;
     final slideOffset = (1 - _animation.value) * panelHeight;
@@ -257,10 +257,8 @@ class _SidebarNotificationPanelState extends State<SidebarNotificationPanel>
             child: ClipPath(
               clipper: _ExcludeRectClipper(panelRect),
               child: BackdropFilter(
-                filter: ImageFilter.blur(
-                  sigmaX: 10 * _animation.value,
-                  sigmaY: 10 * _animation.value,
-                  tileMode: TileMode.mirror,
+                filter: createBlurFilter(
+                  (blurSigma * _animation.value).clamp(0.01, blurSigma),
                 ),
                 child: const SizedBox.expand(),
               ),
@@ -271,7 +269,7 @@ class _SidebarNotificationPanelState extends State<SidebarNotificationPanel>
           child: GestureDetector(
             onTap: NotificationQuickPanel.dismiss,
             child: ColoredBox(
-              color: Colors.black.withValues(alpha: 0.3 * _animation.value),
+              color: barrierColor.withValues(alpha: barrierColor.a * _animation.value),
             ),
           ),
         ),
