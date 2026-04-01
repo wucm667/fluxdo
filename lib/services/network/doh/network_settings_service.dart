@@ -591,8 +591,6 @@ class NetworkSettingsService {
 
   Future<void> _applyWebViewProxy() async {
     if (!shouldRunLocalProxy) return;
-    // macOS 14 以下 / iOS 17 以下调用 setProxyOverride 可能报错
-    if (!Platform.isAndroid && !await _isMacOS14OrAbove() && !await _isiOS17OrAbove()) return;
     final port = _activeProxyPort;
     if (port == null) return;
 
@@ -607,6 +605,9 @@ class NetworkSettingsService {
       }
       return;
     }
+
+    // macOS 14 以下 / iOS 17 以下调用 setProxyOverride 可能报错
+    if (!Platform.isAndroid && !await _isMacOS14OrAbove() && !await _isiOS17OrAbove()) return;
 
     try {
       await inappwebview.ProxyController.instance().setProxyOverride(
