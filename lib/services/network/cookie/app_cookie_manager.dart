@@ -111,6 +111,20 @@ class AppCookieManager extends Interceptor {
     return normalizedDomain.length;
   }
 
+  static bool _isCfChallengePlatformRequest(RequestOptions options) {
+    if (options.extra['isCfChallengePlatform'] == true) {
+      return true;
+    }
+    return options.uri.path.toLowerCase().contains('/cdn-cgi/challenge-platform/');
+  }
+
+  static bool _isCloudflareCookieName(String name) {
+    final normalized = name.toLowerCase();
+    return normalized == 'cf_clearance' ||
+        normalized.startsWith('__cf') ||
+        normalized.startsWith('cf_');
+  }
+
   @override
   Future<void> onRequest(
     RequestOptions options,
@@ -214,9 +228,23 @@ class AppCookieManager extends Interceptor {
           .map((c) => Cookie.fromSetCookieValue(c)),
       ...savedCookies,
     ];
+    final requestCookies = _isCfChallengePlatformRequest(options)
+        ? allCookies
+            .where((cookie) => _isCloudflareCookieName(cookie.name))
+            .toList(growable: false)
+        : allCookies;
+
+    if (_isCfChallengePlatformRequest(options)) {
+      final cookieNames = requestCookies.map((cookie) => cookie.name).toSet().toList()
+        ..sort();
+      debugPrint(
+        '[CookieManager] isolated CF request cookies: '
+        'uri=${options.uri.host}${options.uri.path}, names=$cookieNames',
+      );
+    }
 
     // 诊断：记录 _t cookie 的 host-only/domain 变体
-    final tCookies = allCookies.where((c) => c.name == '_t').toList();
+    final tCookies = requestCookies.where((c) => c.name == '_t').toList();
     if (tCookies.length > 1) {
       final hostOnly = tCookies.where((c) => c.domain == null).map((c) => c.value.length);
       final domain = tCookies.where((c) => c.domain != null).map((c) => '${c.domain}:${c.value.length}');
@@ -243,7 +271,7 @@ class AppCookieManager extends Interceptor {
       });
     }
 
-    final cookies = _mergeCookies(allCookies, options.uri);
+    final cookies = _mergeCookies(requestCookies, options.uri);
     if (tCookies.isNotEmpty) {
       final selectedTCookies = cookies
           .split('; ')
@@ -266,7 +294,7 @@ class AppCookieManager extends Interceptor {
     }
 
     if (options.uri.host == 'connect.linux.do') {
-      final authCookies = allCookies
+      final authCookies = requestCookies
           .where((cookie) => cookie.name == 'auth.session-token')
           .map(
             (cookie) =>
@@ -323,14 +351,21 @@ class AppCookieManager extends Interceptor {
         .map((str) => Cookie.fromSetCookieValue(str))
         .toList();
 
-    // 拦截服务端对关键 cookie 的删除指令。
-    // 服务端可能在 200 响应中通过 Set-Cookie 删除 _t（设置为过期/空值），
-    // 如果无条件写入 CookieJar，会导致验证机制还没判断完 _t 就已经丢了。
-    // 只过滤「删除」操作，正常的「更新」（有值且未过期）仍然放行。
+    final isCfChallengePlatform = _isCfChallengePlatformRequest(
+      response.requestOptions,
+    );
     final filteredCookies = <Cookie>[];
     final filteredSetCookieHeaders = <String>[];
     for (var i = 0; i < cookies.length; i++) {
       final cookie = cookies[i];
+      if (isCfChallengePlatform && !_isCloudflareCookieName(cookie.name)) {
+        debugPrint(
+          '[CookieManager] drop non-CF cookie from challenge-platform response: '
+          '${cookie.name}, uri=${response.requestOptions.uri}',
+        );
+        continue;
+      }
+
       final isSessionCookie = cookie.name == '_t' || cookie.name == '_forum_session';
       if (isSessionCookie) {
         final isExpired = cookie.expires != null &&
@@ -338,7 +373,7 @@ class AppCookieManager extends Interceptor {
         final isDeletion =
             cookie.value == 'del' || cookie.value.isEmpty || isExpired;
         final uri = response.requestOptions.uri;
-        debugPrint('[CookieManager] _t ${isDeletion ? "DEL(blocked)" : "SET"} '
+        debugPrint('[CookieManager] ${cookie.name} ${isDeletion ? "DEL" : "SET"} '
             'from ${response.requestOptions.method} ${uri.host}${uri.path} '
             '(status=${response.statusCode}, len=${cookie.value.length}, '
             'domain=${cookie.domain}, hasLoggedIn=${response.requestOptions.headers['Discourse-Logged-In']})');
@@ -346,8 +381,8 @@ class AppCookieManager extends Interceptor {
           'timestamp': DateTime.now().toIso8601String(),
           'level': isDeletion ? 'warning' : 'info',
           'type': 'cookie_change',
-          'event': isDeletion ? 'token_cookie_delete_blocked' : 'token_cookie_updated',
-          'message': isDeletion ? '${cookie.name} 删除被拦截' : '${cookie.name} cookie 被更新',
+          'event': isDeletion ? 'token_cookie_deleted' : 'token_cookie_updated',
+          'message': isDeletion ? '${cookie.name} cookie 被删除' : '${cookie.name} cookie 被更新',
           'valueLength': cookie.value.length,
           'isExpired': isExpired,
           'method': response.requestOptions.method,
@@ -357,10 +392,6 @@ class AppCookieManager extends Interceptor {
           'cookieDomain': cookie.domain,
           'hasLoggedInHeader': response.requestOptions.headers['Discourse-Logged-In'] == 'true',
         });
-        if (isDeletion) {
-          // 不写入 CookieJar，由业务层（_handleAuthInvalid）决定是否真正清除
-          continue;
-        }
       }
       filteredCookies.add(cookie);
       filteredSetCookieHeaders.add(flattenedSetCookies[i]);

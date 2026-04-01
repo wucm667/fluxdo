@@ -453,7 +453,12 @@ class CfClearanceRefreshService {
             'Origin': AppConstants.baseUrl,
             'Referer': '${AppConstants.baseUrl}/',
           },
-          extra: {'skipCfChallenge': true, 'skipCsrf': true, 'isSilent': true},
+          extra: {
+            'skipCfChallenge': true,
+            'skipCsrf': true,
+            'isSilent': true,
+            'isCfChallengePlatform': true,
+          },
           validateStatus: (status) => status != null,
         ),
       );
