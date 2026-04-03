@@ -36,8 +36,12 @@ import '../widgets/common/loading_dialog.dart';
 import '../widgets/common/fading_edge_scroll_view.dart';
 import '../widgets/offline_indicator.dart';
 import '../l10n/s.dart';
+import '../models/shortcut_binding.dart';
+import '../providers/shortcut_provider.dart';
+import '../widgets/desktop_refresh_indicator.dart';
 import '../services/toast_service.dart';
 import '../utils/dialog_utils.dart';
+import '../utils/platform_utils.dart';
 
 class ScrollToTopNotifier extends StateNotifier<int> {
   ScrollToTopNotifier() : super(0);
@@ -130,6 +134,24 @@ class _TopicsPageState extends ConsumerState<TopicsPage> with TickerProviderStat
     _tabLength = 1 + _visiblePinnedIds.length;
     _tabController = TabController(length: _tabLength, vsync: this);
     _tabController.addListener(_handleTabChange);
+
+  }
+
+  void _registerTabShortcuts() {
+    if (!mounted) return;
+    ref.read(masterShortcutsProvider.notifier).update((current) => {
+      ...current,
+      ShortcutAction.previousTab: () {
+        if (_tabController.index > 0) {
+          _tabController.animateTo(_tabController.index - 1);
+        }
+      },
+      ShortcutAction.nextTab: () {
+        if (_tabController.index < _tabController.length - 1) {
+          _tabController.animateTo(_tabController.index + 1);
+        }
+      },
+    });
   }
 
   @override
@@ -411,6 +433,14 @@ class _TopicsPageState extends ConsumerState<TopicsPage> with TickerProviderStat
 
   @override
   Widget build(BuildContext context) {
+    // 桌面端：注册分类 Tab 切换快捷键（在 build 中确保每次重建都刷新）
+    if (PlatformUtils.isDesktop) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _registerTabShortcuts();
+      });
+    }
+
     final topPadding = MediaQuery.of(context).padding.top;
     final isLoggedIn = ref.watch(currentUserProvider).value != null;
     final allPinnedIds = ref.watch(pinnedCategoriesProvider);
@@ -1005,6 +1035,10 @@ class _TopicListState extends ConsumerState<_TopicList>
   final Set<int> _highlightedTopicIds = {};
   /// 本地缓存的话题数据，非当前 tab 时使用此缓存渲染，不订阅 provider
   AsyncValue<List<Topic>>? _cachedTopicsAsync;
+  /// 键盘焦点索引（J/K 导航用）
+  int _keyboardFocusIndex = -1;
+  /// J/K 防抖：上次触发时间
+  DateTime _lastKeyNavTime = DateTime(0);
 
   @override
   bool get wantKeepAlive => true;
@@ -1028,6 +1062,60 @@ class _TopicListState extends ConsumerState<_TopicList>
   void _clearIncomingState() {
     _highlightedTopicIds.clear();
     ref.read(latestChannelProvider.notifier).clearNewTopicsForCategory(widget.categoryId);
+  }
+
+  /// J/K 键盘导航：移动焦点（含 150ms 防抖）
+  void _moveKeyboardFocus(int delta, AsyncValue<List<Topic>> topicsAsync) {
+    final now = DateTime.now();
+    if (now.difference(_lastKeyNavTime).inMilliseconds < 150) return;
+    _lastKeyNavTime = now;
+
+    final topics = topicsAsync.asData?.value;
+    if (topics == null || topics.isEmpty) return;
+
+    final newIndex = (_keyboardFocusIndex + delta).clamp(0, topics.length - 1);
+    if (newIndex == _keyboardFocusIndex) return;
+
+    setState(() => _keyboardFocusIndex = newIndex);
+
+    final topic = topics[newIndex];
+    _openTopic(topic);
+
+    // 滚动到可见区域
+    final scrollController = PrimaryScrollController.maybeOf(context);
+    if (scrollController != null && scrollController.hasClients) {
+      // 估算位置（每个 item 约 80px 高度）
+      final estimatedPosition = newIndex * 80.0;
+      final viewport = scrollController.position.viewportDimension;
+      final current = scrollController.position.pixels;
+
+      if (estimatedPosition < current || estimatedPosition > current + viewport - 80) {
+        scrollController.animateTo(
+          estimatedPosition.clamp(0.0, scrollController.position.maxScrollExtent),
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    }
+  }
+
+  /// Enter 键打开当前焦点话题
+  void _openFocusedTopic(AsyncValue<List<Topic>> topicsAsync) {
+    final topics = topicsAsync.asData?.value;
+    if (topics == null || topics.isEmpty) return;
+    if (_keyboardFocusIndex < 0 || _keyboardFocusIndex >= topics.length) return;
+
+    final topic = topics[_keyboardFocusIndex];
+    // 强制用 Navigator push 打开（而非 Master-Detail 内选中）
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TopicDetailPage(
+          topicId: topic.id,
+          initialTitle: topic.title,
+          scrollToPostNumber: topic.lastReadPostNumber,
+        ),
+      ),
+    );
   }
 
   void _openTopic(Topic topic) {
@@ -1091,6 +1179,20 @@ class _TopicListState extends ConsumerState<_TopicList>
 
     final selectedTopicId = ref.watch(selectedTopicProvider).topicId;
 
+
+    // 桌面端：注册 J/K/Enter 导航到主面板快捷键
+    if (PlatformUtils.isDesktop && isCurrentTab) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(masterShortcutsProvider.notifier).update((current) => {
+          ...current,
+          ShortcutAction.nextItem: () => _moveKeyboardFocus(1, topicsAsync),
+          ShortcutAction.previousItem: () => _moveKeyboardFocus(-1, topicsAsync),
+          ShortcutAction.openItem: () => _openFocusedTopic(topicsAsync),
+        });
+      });
+    }
+
     return topicsAsync.when(
       data: (topics) {
         if (topics.isEmpty) {
@@ -1122,8 +1224,11 @@ class _TopicListState extends ConsumerState<_TopicList>
         final newTopicCount = incomingState.incomingCountForCategory(widget.categoryId);
         final newTopicOffset = hasNewTopics ? 1 : 0;
 
-        return RefreshIndicator(
-          key: _refreshIndicatorKey,
+        return DesktopRefreshIndicator(
+          refreshIndicatorKey: _refreshIndicatorKey,
+          refreshNotifier: masterRefreshNotifier,
+          shouldRefresh: () =>
+              ref.read(currentTabCategoryIdProvider) == widget.categoryId,
           onRefresh: () async {
             try {
               // ignore: unused_result

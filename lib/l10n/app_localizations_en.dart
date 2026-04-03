@@ -5649,6 +5649,87 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settings_searchEmpty => 'No matching settings found';
 
   @override
+  String get settings_shortcuts => 'Keyboard Shortcuts';
+
+  @override
+  String get shortcuts_navigation => 'Navigation';
+
+  @override
+  String get shortcuts_content => 'Content';
+
+  @override
+  String get shortcuts_navigateBack => 'Go Back';
+
+  @override
+  String get shortcuts_navigateBackAlt => 'Go Back (Alt)';
+
+  @override
+  String get shortcuts_openSearch => 'Search';
+
+  @override
+  String get shortcuts_closeOverlay => 'Close Overlay';
+
+  @override
+  String get shortcuts_openSettings => 'Open Settings';
+
+  @override
+  String get shortcuts_refresh => 'Refresh';
+
+  @override
+  String get shortcuts_showHelp => 'Shortcut Help';
+
+  @override
+  String get shortcuts_recordKey => 'Press a new key combination';
+
+  @override
+  String shortcuts_conflict(String action) {
+    return 'Conflicts with \"$action\"';
+  }
+
+  @override
+  String get shortcuts_resetAll => 'Reset All to Default';
+
+  @override
+  String get shortcuts_resetOne => 'Reset to Default';
+
+  @override
+  String get shortcuts_nextItem => 'Next Item';
+
+  @override
+  String get shortcuts_previousItem => 'Previous Item';
+
+  @override
+  String get shortcuts_openItem => 'Open Selected Item';
+
+  @override
+  String get shortcuts_switchPane => 'Switch Pane Focus';
+
+  @override
+  String get shortcuts_toggleNotifications => 'Notifications';
+
+  @override
+  String get shortcuts_switchToTopics => 'Switch to Topics';
+
+  @override
+  String get shortcuts_switchToProfile => 'Switch to Profile';
+
+  @override
+  String get shortcuts_createTopic => 'Create Topic';
+
+  @override
+  String get shortcuts_previousTab => 'Previous Category';
+
+  @override
+  String get shortcuts_nextTab => 'Next Category';
+
+  @override
+  String get shortcuts_toggleAiPanel => 'AI Assistant Panel';
+
+  @override
+  String get shortcuts_customizeHint =>
+      'Customize in Settings > Keyboard Shortcuts';
+
+  @override
   String get profile_settings => 'App Settings';
 
   @override

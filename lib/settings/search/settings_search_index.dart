@@ -6,11 +6,14 @@ import '../../pages/data_management_page.dart';
 import '../../pages/network_settings_page/network_settings_page.dart';
 import '../../pages/preferences_page.dart';
 import '../../pages/reading_settings_page.dart';
+import '../../pages/shortcut_settings_page.dart';
+import '../../utils/platform_utils.dart';
 import '../definitions/appearance_defs.dart';
 import '../definitions/data_management_defs.dart';
 import '../definitions/network_defs.dart';
 import '../definitions/preferences_defs.dart';
 import '../definitions/reading_defs.dart';
+import '../definitions/shortcut_defs.dart';
 import '../settings_model.dart';
 
 /// 搜索结果项
@@ -100,5 +103,15 @@ List<SettingsSearchResult> buildSearchIndex(BuildContext context) {
       pageBuilder: ({highlightId}) =>
           DataManagementPage(highlightId: highlightId),
     ),
+    // 快捷键（仅桌面端）
+    if (PlatformUtils.isDesktop)
+      ...fromGroups(
+        buildShortcutGroups(context),
+        categoryName: l10n.settings_shortcuts,
+        categoryIcon: Icons.keyboard_rounded,
+        categoryColor: Colors.cyan,
+        pageBuilder: ({highlightId}) =>
+            ShortcutSettingsPage(highlightId: highlightId),
+      ),
   ];
 }

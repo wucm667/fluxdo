@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/draft.dart';
 import '../providers/discourse_providers.dart';
+import '../widgets/desktop_refresh_indicator.dart';
 import '../services/discourse/discourse_service.dart';
 import '../widgets/common/skeleton.dart';
 import '../widgets/common/error_view.dart';
@@ -30,16 +31,19 @@ class DraftsPage extends ConsumerStatefulWidget {
 
 class _DraftsPageState extends ConsumerState<DraftsPage> {
   @override
+  Future<void> _onRefresh() async {
+    ref.invalidate(draftsProvider);
+    await ref.read(draftsProvider.future);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final draftsAsync = ref.watch(draftsProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text(context.l10n.drafts_title)),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(draftsProvider);
-          await ref.read(draftsProvider.future);
-        },
+      body: DesktopRefreshIndicator(
+        onRefresh: _onRefresh,
         child: draftsAsync.when(
           data: (drafts) {
             if (drafts.isEmpty) {

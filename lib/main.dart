@@ -74,7 +74,8 @@ import 'widgets/layout/adaptive_navigation.dart';
 import 'widgets/notification/notification_quick_panel.dart';
 import 'widgets/read_later/read_later_bubble.dart';
 import 'providers/read_later_provider.dart';
-import 'pages/search_page.dart';
+import 'providers/shortcut_provider.dart';
+import 'widgets/keyboard_shortcut_handler.dart';
 import 'utils/platform_utils.dart';
 
 /// 初始化 rhttp Rust runtime
@@ -424,7 +425,7 @@ class MainApp extends ConsumerWidget {
               ),
             );
 
-            // 桌面端：全局鼠标返回键 + 键盘返回快捷键
+            // 桌面端：全局鼠标返回键 + 键盘快捷键（HardwareKeyboard）
             if (PlatformUtils.isDesktop) {
               result = Listener(
                 onPointerDown: (event) {
@@ -433,15 +434,8 @@ class MainApp extends ConsumerWidget {
                     navigatorKey.currentState?.maybePop();
                   }
                 },
-                child: CallbackShortcuts(
-                  bindings: {
-                    const SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true): () {
-                      navigatorKey.currentState?.maybePop();
-                    },
-                    const SingleActivator(LogicalKeyboardKey.bracketLeft, meta: true): () {
-                      navigatorKey.currentState?.maybePop();
-                    },
-                  },
+                child: KeyboardShortcutHandler(
+                  navigatorKey: navigatorKey,
                   child: result,
                 ),
               );
@@ -730,6 +724,14 @@ class _MainPageState extends ConsumerState<MainPage>
     final currentUserAsync = ref.watch(currentUserProvider);
     final user = currentUserAsync.value;
 
+    // 监听外部 tab 切换信号（快捷键触发）
+    ref.listen(switchTabProvider, (_, index) {
+      if (index >= 0 && index != _currentIndex) {
+        ref.read(barVisibilityProvider.notifier).state = 1.0;
+        setState(() => _currentIndex = index);
+      }
+    });
+
     // 首页的 FAB 由 TopicsScreen 内部处理，避免切换时闪烁
     Widget page = PopScope(
       canPop: false,
@@ -763,22 +765,9 @@ class _MainPageState extends ConsumerState<MainPage>
       ),
     );
 
-    // 桌面端全局键盘快捷键
+    // 桌面端需要 Focus 以接收全局快捷键
     if (PlatformUtils.isDesktop) {
-      page = CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.slash): () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SearchPage()),
-            );
-          },
-        },
-        child: Focus(
-          autofocus: true,
-          child: page,
-        ),
-      );
+      page = Focus(autofocus: true, child: page);
     }
 
     return page;

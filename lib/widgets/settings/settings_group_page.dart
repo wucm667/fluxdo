@@ -15,11 +15,15 @@ class SettingsGroupPage extends ConsumerStatefulWidget {
   /// 搜索跳转时传入，用于定位高亮
   final String? highlightId;
 
+  /// AppBar 右侧操作按钮
+  final List<Widget>? actions;
+
   const SettingsGroupPage({
     super.key,
     required this.title,
     required this.groupsBuilder,
     this.highlightId,
+    this.actions,
   });
 
   @override
@@ -61,7 +65,7 @@ class _SettingsGroupPageState extends ConsumerState<SettingsGroupPage> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: AppBar(title: Text(widget.title), actions: widget.actions),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [

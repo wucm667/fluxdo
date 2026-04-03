@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/discourse_providers.dart';
+import '../widgets/desktop_refresh_indicator.dart';
 import '../utils/notification_navigation.dart';
 import '../widgets/notification/notification_item.dart';
 import '../widgets/notification/notification_list_skeleton.dart';
@@ -61,7 +62,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
           ),
         ],
       ),
-      body: RefreshIndicator(
+      body: DesktopRefreshIndicator(
         onRefresh: _onRefresh,
         child: notificationsAsync.when(
           data: (notifications) {

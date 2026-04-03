@@ -10289,6 +10289,162 @@ abstract class AppLocalizations {
   /// **'未找到匹配的设置项'**
   String get settings_searchEmpty;
 
+  /// No description provided for @settings_shortcuts.
+  ///
+  /// In zh, this message translates to:
+  /// **'快捷键'**
+  String get settings_shortcuts;
+
+  /// No description provided for @shortcuts_navigation.
+  ///
+  /// In zh, this message translates to:
+  /// **'导航'**
+  String get shortcuts_navigation;
+
+  /// No description provided for @shortcuts_content.
+  ///
+  /// In zh, this message translates to:
+  /// **'内容'**
+  String get shortcuts_content;
+
+  /// No description provided for @shortcuts_navigateBack.
+  ///
+  /// In zh, this message translates to:
+  /// **'返回'**
+  String get shortcuts_navigateBack;
+
+  /// No description provided for @shortcuts_navigateBackAlt.
+  ///
+  /// In zh, this message translates to:
+  /// **'返回（备用）'**
+  String get shortcuts_navigateBackAlt;
+
+  /// No description provided for @shortcuts_openSearch.
+  ///
+  /// In zh, this message translates to:
+  /// **'搜索'**
+  String get shortcuts_openSearch;
+
+  /// No description provided for @shortcuts_closeOverlay.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭浮层'**
+  String get shortcuts_closeOverlay;
+
+  /// No description provided for @shortcuts_openSettings.
+  ///
+  /// In zh, this message translates to:
+  /// **'打开设置'**
+  String get shortcuts_openSettings;
+
+  /// No description provided for @shortcuts_refresh.
+  ///
+  /// In zh, this message translates to:
+  /// **'刷新'**
+  String get shortcuts_refresh;
+
+  /// No description provided for @shortcuts_showHelp.
+  ///
+  /// In zh, this message translates to:
+  /// **'快捷键帮助'**
+  String get shortcuts_showHelp;
+
+  /// No description provided for @shortcuts_recordKey.
+  ///
+  /// In zh, this message translates to:
+  /// **'请按下新的快捷键组合'**
+  String get shortcuts_recordKey;
+
+  /// No description provided for @shortcuts_conflict.
+  ///
+  /// In zh, this message translates to:
+  /// **'与「{action}」冲突'**
+  String shortcuts_conflict(String action);
+
+  /// No description provided for @shortcuts_resetAll.
+  ///
+  /// In zh, this message translates to:
+  /// **'恢复所有默认'**
+  String get shortcuts_resetAll;
+
+  /// No description provided for @shortcuts_resetOne.
+  ///
+  /// In zh, this message translates to:
+  /// **'恢复默认'**
+  String get shortcuts_resetOne;
+
+  /// No description provided for @shortcuts_nextItem.
+  ///
+  /// In zh, this message translates to:
+  /// **'下一个条目'**
+  String get shortcuts_nextItem;
+
+  /// No description provided for @shortcuts_previousItem.
+  ///
+  /// In zh, this message translates to:
+  /// **'上一个条目'**
+  String get shortcuts_previousItem;
+
+  /// No description provided for @shortcuts_openItem.
+  ///
+  /// In zh, this message translates to:
+  /// **'打开选中条目'**
+  String get shortcuts_openItem;
+
+  /// No description provided for @shortcuts_switchPane.
+  ///
+  /// In zh, this message translates to:
+  /// **'切换面板焦点'**
+  String get shortcuts_switchPane;
+
+  /// No description provided for @shortcuts_toggleNotifications.
+  ///
+  /// In zh, this message translates to:
+  /// **'通知面板'**
+  String get shortcuts_toggleNotifications;
+
+  /// No description provided for @shortcuts_switchToTopics.
+  ///
+  /// In zh, this message translates to:
+  /// **'切换到话题'**
+  String get shortcuts_switchToTopics;
+
+  /// No description provided for @shortcuts_switchToProfile.
+  ///
+  /// In zh, this message translates to:
+  /// **'切换到个人'**
+  String get shortcuts_switchToProfile;
+
+  /// No description provided for @shortcuts_createTopic.
+  ///
+  /// In zh, this message translates to:
+  /// **'创建话题'**
+  String get shortcuts_createTopic;
+
+  /// No description provided for @shortcuts_previousTab.
+  ///
+  /// In zh, this message translates to:
+  /// **'上一个分类'**
+  String get shortcuts_previousTab;
+
+  /// No description provided for @shortcuts_nextTab.
+  ///
+  /// In zh, this message translates to:
+  /// **'下一个分类'**
+  String get shortcuts_nextTab;
+
+  /// No description provided for @shortcuts_toggleAiPanel.
+  ///
+  /// In zh, this message translates to:
+  /// **'AI 助手面板'**
+  String get shortcuts_toggleAiPanel;
+
+  /// No description provided for @shortcuts_customizeHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'在 设置 > 快捷键 中自定义'**
+  String get shortcuts_customizeHint;
+
   /// No description provided for @profile_settings.
   ///
   /// In zh, this message translates to:

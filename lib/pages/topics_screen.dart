@@ -7,7 +7,9 @@ import 'package:uuid/uuid.dart';
 import '../l10n/s.dart';
 import '../providers/preferences_provider.dart';
 import '../providers/selected_topic_provider.dart';
+import '../providers/shortcut_provider.dart';
 import '../providers/discourse_providers.dart';
+import '../utils/platform_utils.dart';
 import '../utils/blur_config.dart';
 import '../utils/responsive.dart';
 import '../widgets/layout/master_detail_layout.dart';
@@ -131,9 +133,9 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen> {
     // 手机/平板单栏：只显示 master
     // 平板双栏：显示 master + detail
     return MasterDetailLayout(
-      master: const TopicsPage(),
+      master: _wrapPaneTap(ActivePane.master, const TopicsPage()),
       detail: selectedTopic.hasSelection && canShowDetailPane
-          ? TopicDetailPane(
+          ? _wrapPaneTap(ActivePane.detail, TopicDetailPane(
               key: ValueKey(selectedTopic.topicId),
               topicId: selectedTopic.topicId!,
               parentActive: widget.isActive,
@@ -143,7 +145,7 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen> {
               ),
               initialTitle: selectedTopic.initialTitle,
               scrollToPostNumber: selectedTopic.scrollToPostNumber,
-            )
+            ))
           : null,
       masterFloatingActionButton: user != null
           ? _TopicsFab(
@@ -151,6 +153,21 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen> {
               onOpenDrafts: () => _openDrafts(context),
             )
           : null,
+    );
+  }
+
+  /// 包裹面板：点击切换活跃面板 + Tab 切换时短暂高亮顶部指示条
+  Widget _wrapPaneTap(ActivePane pane, Widget child) {
+    if (!PlatformUtils.isDesktop) return child;
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) {
+        // 点击切换时不显示指示器（鼠标用户不需要）
+        if (ref.read(activePaneProvider) != pane) {
+          ref.read(activePaneProvider.notifier).state = pane;
+        }
+      },
+      child: _PaneActiveIndicator(pane: pane, child: child),
     );
   }
 
@@ -484,6 +501,98 @@ class _TopicsFabState extends ConsumerState<_TopicsFab>
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 面板活跃 HUD 指示器：Tab 切换时在面板中央短暂显示半透明浮层
+class _PaneActiveIndicator extends ConsumerStatefulWidget {
+  final ActivePane pane;
+  final Widget child;
+
+  const _PaneActiveIndicator({required this.pane, required this.child});
+
+  @override
+  ConsumerState<_PaneActiveIndicator> createState() =>
+      _PaneActiveIndicatorState();
+}
+
+class _PaneActiveIndicatorState extends ConsumerState<_PaneActiveIndicator>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _anim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+      reverseDuration: const Duration(milliseconds: 400),
+    );
+  }
+
+  @override
+  void dispose() {
+    _anim.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 仅监听键盘切换信号，点击切换不触发 HUD
+    ref.listen(paneSwitchSignalProvider, (prev, next) {
+      if (prev != next && ref.read(activePaneProvider) == widget.pane) {
+        _anim.forward(from: 0).then((_) {
+          Future.delayed(const Duration(milliseconds: 800), () {
+            if (mounted) _anim.reverse();
+          });
+        });
+      }
+    });
+
+    final theme = Theme.of(context);
+    final label = widget.pane == ActivePane.master
+        ? context.l10n.shortcuts_navigation
+        : context.l10n.shortcuts_content;
+    final icon = widget.pane == ActivePane.master
+        ? Icons.list_rounded
+        : Icons.article_rounded;
+
+    return Stack(
+      children: [
+        widget.child,
+        Positioned.fill(
+          child: IgnorePointer(
+            child: Center(
+              child: FadeTransition(
+                opacity: _anim,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.inverseSurface
+                        .withValues(alpha: 0.8),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(icon, size: 18, color: theme.colorScheme.onInverseSurface),
+                      const SizedBox(width: 8),
+                      Text(
+                        label,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: theme.colorScheme.onInverseSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

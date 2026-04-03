@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../l10n/s.dart';
 import '../settings/search/settings_search_index.dart';
+import '../utils/platform_utils.dart';
 import 'about_page.dart';
 import 'appearance_page.dart';
 import 'data_management_page.dart';
 import 'network_settings_page/network_settings_page.dart';
 import 'preferences_page.dart';
 import 'reading_settings_page.dart';
+import 'shortcut_settings_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -229,6 +231,19 @@ class _SettingsPageState extends State<SettingsPage> {
                     MaterialPageRoute(
                         builder: (_) => const DataManagementPage())),
               ),
+              // 快捷键（仅桌面端）
+              if (PlatformUtils.isDesktop) ...[
+                _buildDivider(theme),
+                _buildOptionTile(
+                  icon: Icons.keyboard_rounded,
+                  iconColor: Colors.cyan,
+                  title: l10n.settings_shortcuts,
+                  onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const ShortcutSettingsPage())),
+                ),
+              ],
               _buildDivider(theme),
               _buildOptionTile(
                 icon: Icons.info_rounded,

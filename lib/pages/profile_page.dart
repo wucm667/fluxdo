@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../providers/discourse_providers.dart';
+import '../providers/shortcut_provider.dart';
+import '../widgets/desktop_refresh_indicator.dart';
 import '../services/discourse_cache_manager.dart';
 import 'webview_page.dart';
 import 'webview_login_page.dart';
@@ -286,6 +288,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   
   @override
   Widget build(BuildContext context) {
+
     final theme = Theme.of(context);
     final userState = ref.watch(currentUserProvider);
     final isLoggedIn = userState.value != null;
@@ -373,7 +376,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final hasError = userState.hasError && !userState.hasValue;
     final errorMessage = userState.error?.toString() ?? '';
 
-    return RefreshIndicator(
+    return DesktopRefreshIndicator(
+      refreshNotifier: masterRefreshNotifier,
+      shouldRefresh: () => widget.isActive,
       onRefresh: _refreshData,
       child: ListView(
         controller: _scrollController,
@@ -481,7 +486,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final isLoggedIn = userState.value != null;
     final user = userState.value;
 
-    return RefreshIndicator(
+    return DesktopRefreshIndicator(
+      refreshNotifier: masterRefreshNotifier,
+      shouldRefresh: () => widget.isActive,
       onRefresh: _refreshData,
       child: ListView(
         controller: _rightScrollController,

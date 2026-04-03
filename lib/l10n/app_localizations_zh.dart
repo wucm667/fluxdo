@@ -5520,6 +5520,86 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settings_searchEmpty => '未找到匹配的设置项';
 
   @override
+  String get settings_shortcuts => '快捷键';
+
+  @override
+  String get shortcuts_navigation => '导航';
+
+  @override
+  String get shortcuts_content => '内容';
+
+  @override
+  String get shortcuts_navigateBack => '返回';
+
+  @override
+  String get shortcuts_navigateBackAlt => '返回（备用）';
+
+  @override
+  String get shortcuts_openSearch => '搜索';
+
+  @override
+  String get shortcuts_closeOverlay => '关闭浮层';
+
+  @override
+  String get shortcuts_openSettings => '打开设置';
+
+  @override
+  String get shortcuts_refresh => '刷新';
+
+  @override
+  String get shortcuts_showHelp => '快捷键帮助';
+
+  @override
+  String get shortcuts_recordKey => '请按下新的快捷键组合';
+
+  @override
+  String shortcuts_conflict(String action) {
+    return '与「$action」冲突';
+  }
+
+  @override
+  String get shortcuts_resetAll => '恢复所有默认';
+
+  @override
+  String get shortcuts_resetOne => '恢复默认';
+
+  @override
+  String get shortcuts_nextItem => '下一个条目';
+
+  @override
+  String get shortcuts_previousItem => '上一个条目';
+
+  @override
+  String get shortcuts_openItem => '打开选中条目';
+
+  @override
+  String get shortcuts_switchPane => '切换面板焦点';
+
+  @override
+  String get shortcuts_toggleNotifications => '通知面板';
+
+  @override
+  String get shortcuts_switchToTopics => '切换到话题';
+
+  @override
+  String get shortcuts_switchToProfile => '切换到个人';
+
+  @override
+  String get shortcuts_createTopic => '创建话题';
+
+  @override
+  String get shortcuts_previousTab => '上一个分类';
+
+  @override
+  String get shortcuts_nextTab => '下一个分类';
+
+  @override
+  String get shortcuts_toggleAiPanel => 'AI 助手面板';
+
+  @override
+  String get shortcuts_customizeHint => '在 设置 > 快捷键 中自定义';
+
+  @override
   String get profile_settings => '应用设置';
 
   @override
@@ -11077,6 +11157,86 @@ class AppLocalizationsZhHk extends AppLocalizationsZh {
   String get settings_searchEmpty => '未找到匹配的設定項';
 
   @override
+  String get settings_shortcuts => '快捷鍵';
+
+  @override
+  String get shortcuts_navigation => '導覽';
+
+  @override
+  String get shortcuts_content => '內容';
+
+  @override
+  String get shortcuts_navigateBack => '返回';
+
+  @override
+  String get shortcuts_navigateBackAlt => '返回（備用）';
+
+  @override
+  String get shortcuts_openSearch => '搜尋';
+
+  @override
+  String get shortcuts_closeOverlay => '關閉浮層';
+
+  @override
+  String get shortcuts_openSettings => '開啟設定';
+
+  @override
+  String get shortcuts_refresh => '重新整理';
+
+  @override
+  String get shortcuts_showHelp => '快捷鍵說明';
+
+  @override
+  String get shortcuts_recordKey => '請按下新的快捷鍵組合';
+
+  @override
+  String shortcuts_conflict(String action) {
+    return '與「$action」衝突';
+  }
+
+  @override
+  String get shortcuts_resetAll => '恢復所有預設';
+
+  @override
+  String get shortcuts_resetOne => '恢復預設';
+
+  @override
+  String get shortcuts_nextItem => '下一個條目';
+
+  @override
+  String get shortcuts_previousItem => '上一個條目';
+
+  @override
+  String get shortcuts_openItem => '開啟選中條目';
+
+  @override
+  String get shortcuts_switchPane => '切換面板焦點';
+
+  @override
+  String get shortcuts_toggleNotifications => '通知面板';
+
+  @override
+  String get shortcuts_switchToTopics => '切換到話題';
+
+  @override
+  String get shortcuts_switchToProfile => '切換到個人';
+
+  @override
+  String get shortcuts_createTopic => '建立話題';
+
+  @override
+  String get shortcuts_previousTab => '上一個分類';
+
+  @override
+  String get shortcuts_nextTab => '下一個分類';
+
+  @override
+  String get shortcuts_toggleAiPanel => 'AI 助手面板';
+
+  @override
+  String get shortcuts_customizeHint => '在 設定 > 快捷鍵 中自訂';
+
+  @override
   String get profile_settings => '應用設定';
 
   @override
@@ -16632,6 +16792,86 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settings_searchEmpty => '未找到符合的設定項';
+
+  @override
+  String get settings_shortcuts => '快捷鍵';
+
+  @override
+  String get shortcuts_navigation => '導航';
+
+  @override
+  String get shortcuts_content => '內容';
+
+  @override
+  String get shortcuts_navigateBack => '返回';
+
+  @override
+  String get shortcuts_navigateBackAlt => '返回（備用）';
+
+  @override
+  String get shortcuts_openSearch => '搜尋';
+
+  @override
+  String get shortcuts_closeOverlay => '關閉浮層';
+
+  @override
+  String get shortcuts_openSettings => '開啟設定';
+
+  @override
+  String get shortcuts_refresh => '重新整理';
+
+  @override
+  String get shortcuts_showHelp => '快捷鍵說明';
+
+  @override
+  String get shortcuts_recordKey => '請按下新的快捷鍵組合';
+
+  @override
+  String shortcuts_conflict(String action) {
+    return '與「$action」衝突';
+  }
+
+  @override
+  String get shortcuts_resetAll => '恢復所有預設';
+
+  @override
+  String get shortcuts_resetOne => '恢復預設';
+
+  @override
+  String get shortcuts_nextItem => '下一個條目';
+
+  @override
+  String get shortcuts_previousItem => '上一個條目';
+
+  @override
+  String get shortcuts_openItem => '開啟選中條目';
+
+  @override
+  String get shortcuts_switchPane => '切換面板焦點';
+
+  @override
+  String get shortcuts_toggleNotifications => '通知面板';
+
+  @override
+  String get shortcuts_switchToTopics => '切換到話題';
+
+  @override
+  String get shortcuts_switchToProfile => '切換到個人';
+
+  @override
+  String get shortcuts_createTopic => '建立話題';
+
+  @override
+  String get shortcuts_previousTab => '上一個分類';
+
+  @override
+  String get shortcuts_nextTab => '下一個分類';
+
+  @override
+  String get shortcuts_toggleAiPanel => 'AI 助手面板';
+
+  @override
+  String get shortcuts_customizeHint => '在 設定 > 快捷鍵 中自訂';
 
   @override
   String get profile_settings => '應用設定';

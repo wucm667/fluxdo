@@ -78,6 +78,26 @@ extension _ScrollActions on _TopicDetailPageState {
     await notifier.reloadWithPostNumber(1);
   }
 
+  /// J 键：向下滚动一个帖子的距离
+  void _scrollToNextPost() => _navigatePostByPixels(1);
+
+  /// K 键：向上滚动一个帖子的距离
+  void _scrollToPreviousPost() => _navigatePostByPixels(-1);
+
+  /// 帖子导航：直接用像素滚动，简单可靠
+  void _navigatePostByPixels(int delta) {
+    if (!mounted) return;
+    final sc = _controller.scrollController;
+    if (!sc.hasClients) return;
+
+    final target = sc.offset + delta * 400;
+    sc.animateTo(
+      target.clamp(0.0, sc.position.maxScrollExtent),
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+    );
+  }
+
   Future<void> _scrollToPost(int postNumber) async {
     final params = _params;
     final detail = ref.read(topicDetailProvider(params)).value;

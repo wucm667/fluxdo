@@ -57,6 +57,10 @@ import '../edit_topic_page.dart';
 import 'widgets/ai_chat_page.dart';
 import 'widgets/ai_chat_guide.dart';
 import '../../utils/dialog_utils.dart';
+import '../../utils/platform_utils.dart';
+import '../../models/shortcut_binding.dart';
+import '../../providers/shortcut_provider.dart';
+import '../../widgets/desktop_refresh_indicator.dart';
 
 part 'actions/_scroll_actions.dart';
 part 'actions/_user_actions.dart';
@@ -218,6 +222,64 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage>
 
     _controller.scrollController.addListener(_onScroll);
     _pageController = PageController(initialPage: 0);
+
+    // 桌面端：注册 J/K 帖子导航 + AI 面板切换
+    if (PlatformUtils.isDesktop) {
+      toggleAiPanelNotifier.addListener(_onToggleAiPanel);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _registerPostShortcuts();
+      });
+    }
+  }
+
+  bool _isAiSheetOpen = false;
+
+  void _onToggleAiPanel() {
+    if (!mounted) return;
+    final swipeMode = ref.read(preferencesProvider).aiSwipeEntry;
+    if (swipeMode) {
+      // 滑动模式：PageView 切换
+      final target = _currentPageNotifier.value == 0 ? 1 : 0;
+      _pageController.animateToPage(
+        target,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    } else {
+      // 弹窗模式：切换开关
+      if (_isAiSheetOpen) {
+        Navigator.of(context).pop();
+        _isAiSheetOpen = false;
+      } else {
+        final detail = ref.read(topicDetailProvider(_params)).value;
+        if (detail == null) return;
+        _isAiSheetOpen = true;
+        _showAiAssistantSheet(detail);
+      }
+    }
+  }
+
+  void _registerPostShortcuts() {
+    // 闭包内用 mounted 保护，防止 disposed 后被调用
+    final shortcuts = <ShortcutAction, VoidCallback>{
+      ShortcutAction.nextItem: () {
+        if (mounted) _scrollToNextPost();
+      },
+      ShortcutAction.previousItem: () {
+        if (mounted) _scrollToPreviousPost();
+      },
+    };
+    if (widget.embeddedMode) {
+      ref.read(detailShortcutsProvider.notifier).state = shortcuts;
+    } else {
+      ref.read(contextShortcutsProvider.notifier).state = {
+        ...shortcuts,
+        ShortcutAction.closeOverlay: () {
+          if (mounted) Navigator.of(context).maybePop();
+        },
+      };
+    }
   }
 
   @override
@@ -267,6 +329,15 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage>
     _controller.scrollController.removeListener(_onScroll);
     _screenTrack.stop();
     _controller.dispose();
+    if (PlatformUtils.isDesktop) {
+      toggleAiPanelNotifier.removeListener(_onToggleAiPanel);
+      // 同步注销快捷键
+      if (widget.embeddedMode) {
+        ref.read(detailShortcutsProvider.notifier).state = {};
+      } else {
+        ref.read(contextShortcutsProvider.notifier).state = {};
+      }
+    }
     // 延迟清理搜索状态，避免在 widget tree finalizing 期间修改 provider
     Future(_topicSearchNotifier.exitSearchMode);
     super.dispose();
@@ -782,6 +853,7 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage>
       }
     });
 
+
     final params = _params;
     final detailAsync = ref.watch(topicDetailProvider(params));
     final detail = detailAsync.value;
@@ -1036,7 +1108,7 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage>
           );
         },
       ),
-    );
+    ).then((_) => _isAiSheetOpen = false);
   }
 
   Widget _buildBody(
@@ -1332,7 +1404,10 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage>
       },
     );
 
-    scrollView = RefreshIndicator(
+    scrollView = DesktopRefreshIndicator(
+      refreshNotifier: widget.embeddedMode
+          ? detailRefreshNotifier
+          : desktopRefreshNotifier,
       onRefresh: _handleRefresh,
       notificationPredicate: (notification) {
         if (!hasFirstPost) return false;

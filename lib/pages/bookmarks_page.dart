@@ -18,6 +18,7 @@ import '../widgets/topic/topic_list_skeleton.dart';
 import '../widgets/topic/topic_preview_dialog.dart';
 import '../widgets/common/error_view.dart';
 import '../l10n/s.dart';
+import '../widgets/desktop_refresh_indicator.dart';
 import 'topic_detail_page/topic_detail_page.dart';
 
 /// 我的书签页面
@@ -42,7 +43,6 @@ class _BookmarksPageState extends ConsumerState<BookmarksPage> {
   @override
   void dispose() {
     _scrollController.dispose();
-    // 延迟清理搜索状态，避免在 widget tree finalizing 期间修改 provider
     Future(_searchNotifier.exitSearchMode);
     super.dispose();
   }
@@ -70,6 +70,8 @@ class _BookmarksPageState extends ConsumerState<BookmarksPage> {
       ),
     );
   }
+
+  @override
 
   @override
   Widget build(BuildContext context) {
@@ -302,7 +304,7 @@ class _BookmarksPageState extends ConsumerState<BookmarksPage> {
   }
 
   Widget _buildTopicList(AsyncValue<List<Topic>> bookmarksAsync) {
-    return RefreshIndicator(
+    return DesktopRefreshIndicator(
       onRefresh: _onRefresh,
       child: bookmarksAsync.when(
         data: (topics) {

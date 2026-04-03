@@ -18,6 +18,7 @@ import '../models/search_filter.dart';
 import 'package:dio/dio.dart';
 import '../services/app_error_handler.dart';
 import '../l10n/s.dart';
+import '../widgets/desktop_refresh_indicator.dart';
 import 'create_topic_page.dart';
 import '../utils/dialog_utils.dart';
 
@@ -61,6 +62,7 @@ class _CategoryTopicsPageState extends ConsumerState<CategoryTopicsPage> {
     _scrollController.addListener(_onScroll);
     _resolveParentSlug();
     _loadTopics();
+
   }
 
   @override
@@ -410,7 +412,7 @@ class _CategoryTopicsPageState extends ConsumerState<CategoryTopicsPage> {
       );
     }
 
-    return RefreshIndicator(
+    return DesktopRefreshIndicator(
       onRefresh: _loadTopics,
       child: ListView.builder(
         controller: _scrollController,

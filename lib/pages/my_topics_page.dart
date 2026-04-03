@@ -11,6 +11,7 @@ import '../widgets/topic/topic_list_skeleton.dart';
 import '../providers/preferences_provider.dart';
 import '../widgets/common/error_view.dart';
 import '../l10n/s.dart';
+import '../widgets/desktop_refresh_indicator.dart';
 import 'topic_detail_page/topic_detail_page.dart';
 
 /// 我的话题页面
@@ -114,7 +115,7 @@ class _MyTopicsPageState extends ConsumerState<MyTopicsPage> {
   }
 
   Widget _buildTopicList(AsyncValue<List<Topic>> myTopicsAsync) {
-    return RefreshIndicator(
+    return DesktopRefreshIndicator(
       onRefresh: _onRefresh,
       child: myTopicsAsync.when(
         data: (topics) {

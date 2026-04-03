@@ -15,6 +15,7 @@ import '../models/search_filter.dart';
 import 'package:dio/dio.dart';
 import '../services/app_error_handler.dart';
 import '../l10n/s.dart';
+import '../widgets/desktop_refresh_indicator.dart';
 
 /// 标签话题列表页面
 class TagTopicsPage extends ConsumerStatefulWidget {
@@ -53,6 +54,7 @@ class _TagTopicsPageState extends ConsumerState<TagTopicsPage> {
     _ascending = ref.read(topicSortAscendingProvider);
     _scrollController.addListener(_onScroll);
     _loadTopics();
+
   }
 
   @override
@@ -290,7 +292,7 @@ class _TagTopicsPageState extends ConsumerState<TagTopicsPage> {
       );
     }
 
-    return RefreshIndicator(
+    return DesktopRefreshIndicator(
       onRefresh: _loadTopics,
       child: ListView.builder(
         controller: _scrollController,

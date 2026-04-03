@@ -8,6 +8,9 @@ import '../utils/hero_visibility_controller.dart';
 import '../utils/svg_utils.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/shortcut_binding.dart';
+import '../providers/shortcut_provider.dart';
 import '../services/toast_service.dart';
 import '../utils/platform_utils.dart';
 import '../widgets/common/image_context_menu.dart';
@@ -319,16 +322,21 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     }
   }
 
-  /// 桌面端包裹 Esc 快捷键退出
+  /// 桌面端包裹快捷键退出（从 shortcutProvider 读取 closeOverlay 绑定）
   Widget _wrapDesktopShortcuts(BuildContext context, Widget child) {
     if (!PlatformUtils.isDesktop) return child;
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.escape): () {
-          Navigator.of(context).pop();
-        },
+    return Consumer(
+      builder: (context, ref, _) {
+        final binding =
+            ref.read(shortcutProvider.notifier).getBinding(ShortcutAction.closeOverlay);
+        return CallbackShortcuts(
+          bindings: {
+            if (binding != null)
+              binding.activator: () => Navigator.of(context).pop(),
+          },
+          child: Focus(autofocus: true, child: child),
+        );
       },
-      child: Focus(autofocus: true, child: child),
     );
   }
 

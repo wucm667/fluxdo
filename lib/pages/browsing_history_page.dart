@@ -11,6 +11,7 @@ import '../widgets/topic/topic_list_skeleton.dart';
 import '../providers/preferences_provider.dart';
 import '../widgets/common/error_view.dart';
 import '../l10n/s.dart';
+import '../widgets/desktop_refresh_indicator.dart';
 import 'topic_detail_page/topic_detail_page.dart';
 
 /// 浏览历史页面
@@ -29,14 +30,13 @@ class _BrowsingHistoryPageState extends ConsumerState<BrowsingHistoryPage> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    // 提前保存 notifier 引用，避免在 dispose 中使用 ref
     _searchNotifier = ref.read(userContentSearchProvider(SearchInType.seen).notifier);
+
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
-    // 延迟清理搜索状态，避免在 widget tree finalizing 期间修改 provider
     Future(_searchNotifier.exitSearchMode);
     super.dispose();
   }
@@ -115,7 +115,7 @@ class _BrowsingHistoryPageState extends ConsumerState<BrowsingHistoryPage> {
   }
 
   Widget _buildTopicList(AsyncValue<List<Topic>> historyAsync) {
-    return RefreshIndicator(
+    return DesktopRefreshIndicator(
       onRefresh: _onRefresh,
       child: historyAsync.when(
         data: (topics) {
