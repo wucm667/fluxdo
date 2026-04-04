@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter/material.dart' hide Badge;
 import 'dart:async';
+import 'dart:io';
 import 'package:dio/dio.dart';
 import '../../models/topic.dart';
 import '../../models/topic_vote.dart';
