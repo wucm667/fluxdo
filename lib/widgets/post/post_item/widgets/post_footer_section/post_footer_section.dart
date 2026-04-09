@@ -15,6 +15,7 @@ import '../../../../../services/toast_service.dart';
 import '../../../post_links.dart';
 import '../post_action_bar.dart';
 import '../../../../bookmark/bookmark_edit_sheet.dart';
+import '../../../../post/post_boost/boost_list.dart';
 import '../post_flag_sheet.dart';
 import '../post_reaction_picker.dart';
 import '../post_reaction_users_sheet.dart';
@@ -49,6 +50,8 @@ class PostFooterSection extends ConsumerStatefulWidget {
   final VoidCallback? onShowPostDetail;
   /// 自定义帖子详情菜单项文本（默认"帖子详情"，弹框中可用"跳转"）
   final String? postDetailLabel;
+  /// Boost 更新回调
+  final void Function(Post updatedPost)? onBoostUpdated;
 
   const PostFooterSection({
     super.key,
@@ -68,6 +71,7 @@ class PostFooterSection extends ConsumerStatefulWidget {
     this.hideRepliesButton = false,
     this.onShowPostDetail,
     this.postDetailLabel,
+    this.onBoostUpdated,
   });
 
   @override
@@ -172,6 +176,12 @@ class _PostFooterSectionState extends ConsumerState<PostFooterSection> {
             onShowMoreMenu: () => _showMoreMenu(context, theme),
             onToggleReplies: _toggleReplies,
           ),
+          // Boost 气泡列表
+          if ((widget.post.boosts != null && widget.post.boosts!.isNotEmpty) || widget.post.canBoost)
+            BoostList(
+              post: widget.post,
+              onPostUpdated: widget.onBoostUpdated,
+            ),
           ValueListenableBuilder<bool>(
             valueListenable: _showRepliesNotifier,
             builder: (context, showReplies, _) {

@@ -581,6 +581,10 @@ class Post {
   // 帖子提示信息
   final PostNotice? notice;
 
+  // Boost（微反应气泡）
+  final List<Boost>? boosts;
+  final bool canBoost;
+
   Post({
     required this.id,
     this.name,
@@ -638,6 +642,8 @@ class Post {
     this.cookedHidden = false,
     this.canSeeHiddenPost = false,
     this.notice,
+    this.boosts,
+    this.canBoost = false,
   });
 
   factory Post.fromJson(Map<String, dynamic> json) {
@@ -724,6 +730,10 @@ class Post {
       notice: json['notice'] != null
           ? PostNotice.fromJson(json['notice'] as Map<String, dynamic>)
           : null,
+      boosts: (json['boosts'] as List<dynamic>?)
+          ?.map((e) => Boost.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      canBoost: json['can_boost'] as bool? ?? false,
     );
   }
 
@@ -762,10 +772,12 @@ class Post {
           hidden == other.hidden &&
           cookedHidden == other.cookedHidden &&
           listEquals(reactions, other.reactions) &&
-          currentUserReaction == other.currentUserReaction;
+          currentUserReaction == other.currentUserReaction &&
+          listEquals(boosts, other.boosts) &&
+          canBoost == other.canBoost;
 
   @override
-  int get hashCode => Object.hash(id, cooked, likeCount, bookmarked, acceptedAnswer, hidden);
+  int get hashCode => Object.hash(id, cooked, likeCount, bookmarked, acceptedAnswer, hidden, canBoost);
 
   /// 复制并修改部分字段
   Post copyWith({
@@ -827,6 +839,8 @@ class Post {
     bool? cookedHidden,
     bool? canSeeHiddenPost,
     PostNotice? notice,
+    List<Boost>? boosts,
+    bool? canBoost,
     bool clearCurrentUserReaction = false,
   }) {
     return Post(
@@ -886,7 +900,98 @@ class Post {
       cookedHidden: cookedHidden ?? this.cookedHidden,
       canSeeHiddenPost: canSeeHiddenPost ?? this.canSeeHiddenPost,
       notice: notice ?? this.notice,
+      boosts: boosts ?? this.boosts,
+      canBoost: canBoost ?? this.canBoost,
     );
+  }
+}
+
+/// Boost（微反应气泡）
+class Boost {
+  final int id;
+  final String cooked; // 渲染后的 HTML
+  final BoostUser user;
+  final bool canDelete;
+  final bool canFlag;
+  final int? userFlagStatus;
+  final List<String>? availableFlags;
+
+  const Boost({
+    required this.id,
+    required this.cooked,
+    required this.user,
+    this.canDelete = false,
+    this.canFlag = false,
+    this.userFlagStatus,
+    this.availableFlags,
+  });
+
+  factory Boost.fromJson(Map<String, dynamic> json) {
+    return Boost(
+      id: json['id'] as int,
+      cooked: json['cooked'] as String? ?? '',
+      user: BoostUser.fromJson(json['user'] as Map<String, dynamic>),
+      canDelete: json['can_delete'] as bool? ?? false,
+      canFlag: json['can_flag'] as bool? ?? false,
+      userFlagStatus: json['user_flag_status'] as int?,
+      availableFlags: (json['available_flags'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList(),
+    );
+  }
+
+  Boost copyWith({
+    bool? canDelete,
+    bool? canFlag,
+    int? userFlagStatus,
+    List<String>? availableFlags,
+  }) {
+    return Boost(
+      id: id,
+      cooked: cooked,
+      user: user,
+      canDelete: canDelete ?? this.canDelete,
+      canFlag: canFlag ?? this.canFlag,
+      userFlagStatus: userFlagStatus ?? this.userFlagStatus,
+      availableFlags: availableFlags ?? this.availableFlags,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is Boost && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+}
+
+/// Boost 用户信息
+class BoostUser {
+  final int id;
+  final String username;
+  final String? name;
+  final String avatarTemplate;
+
+  const BoostUser({
+    required this.id,
+    required this.username,
+    this.name,
+    required this.avatarTemplate,
+  });
+
+  factory BoostUser.fromJson(Map<String, dynamic> json) {
+    return BoostUser(
+      id: json['id'] as int,
+      username: json['username'] as String? ?? '',
+      name: json['name'] as String?,
+      avatarTemplate: json['avatar_template'] as String? ?? '',
+    );
+  }
+
+  /// 获取头像 URL
+  String getAvatarUrl({int size = 48}) {
+    final template = avatarTemplate.replaceAll('{size}', '$size');
+    return UrlHelper.resolveUrlWithCdn(template);
   }
 }
 

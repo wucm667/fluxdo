@@ -1981,5 +1981,23 @@
         "type": "int"
       }
     }
-  }
+  },
+  "boost_placeholder": "Say something...",
+  "boost_send": "Send",
+  "boost_deleteConfirm": "Are you sure you want to delete this boost?",
+  "boost_deleted": "Boost deleted",
+  "boost_created": "Boost sent",
+  "boost_failed": "Failed to send boost",
+  "boost_deleteFailed": "Failed to delete boost",
+  "boost_flagTitle": "Flag Boost",
+  "boost_flagSubmitted": "Flag submitted",
+  "boost_tooLong": "Content too long, max {count} characters",
+  "@boost_tooLong": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "boost_limitReached": "Boost limit reached for this post"
 }

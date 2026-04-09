@@ -346,6 +346,29 @@ extension PostUpdateMethods on TopicDetailNotifier {
     ));
   }
 
+  /// 添加 Boost 到帖子（用于 MessageBus boost_added 消息）
+  void addBoostToPost(int postId, Map<String, dynamic> boostData) {
+    _updatePostById(postId, (post) {
+      final newBoost = Boost.fromJson(boostData);
+      final currentBoosts = List<Boost>.from(post.boosts ?? []);
+      // 避免重复添加
+      if (currentBoosts.any((b) => b.id == newBoost.id)) return post;
+      currentBoosts.add(newBoost);
+      return post.copyWith(boosts: currentBoosts, canBoost: false);
+    });
+  }
+
+  /// 从帖子移除 Boost（用于 MessageBus boost_removed 消息）
+  void removeBoostFromPost(int postId, int boostId) {
+    _updatePostById(postId, (post) {
+      final currentBoosts = List<Boost>.from(post.boosts ?? []);
+      final removed = currentBoosts.removeWhere((b) => b.id == boostId);
+      // 删除后可能恢复 canBoost，但这取决于是否是自己的 boost
+      // 由于 MessageBus 不携带这个信息，保守处理不改变 canBoost
+      return post.copyWith(boosts: currentBoosts);
+    });
+  }
+
   /// 重新加载话题元数据（只更新元数据，不刷新帖子流）
   Future<void> reloadTopicMetadata() async {
     final currentDetail = state.value;

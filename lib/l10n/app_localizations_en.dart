@@ -5895,4 +5895,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String table_rowCount(int count) {
     return '$count rows';
   }
+
+  @override
+  String get boost_placeholder => 'Say something...';
+
+  @override
+  String get boost_send => 'Send';
+
+  @override
+  String get boost_deleteConfirm =>
+      'Are you sure you want to delete this boost?';
+
+  @override
+  String get boost_deleted => 'Boost deleted';
+
+  @override
+  String get boost_created => 'Boost sent';
+
+  @override
+  String get boost_failed => 'Failed to send boost';
+
+  @override
+  String get boost_deleteFailed => 'Failed to delete boost';
+
+  @override
+  String get boost_flagTitle => 'Flag Boost';
+
+  @override
+  String get boost_flagSubmitted => 'Flag submitted';
+
+  @override
+  String boost_tooLong(int count) {
+    return 'Content too long, max $count characters';
+  }
+
+  @override
+  String get boost_limitReached => 'Boost limit reached for this post';
 }

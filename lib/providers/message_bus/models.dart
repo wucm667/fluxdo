@@ -75,6 +75,8 @@ enum TopicMessageType {
   unliked,    // 有人取消点赞
   read,       // 有人阅读了帖子
   stats,      // 话题统计更新
+  boostAdded,    // 有人发送了 Boost
+  boostRemoved,  // Boost 被删除
   moveToInbox,    // 私信移入收件箱
   archived,       // 私信被归档
   removeAllowedUser, // 用户被移出私信
@@ -88,6 +90,8 @@ class PostUpdate {
   final int? likesCount;  // 用于 liked/unliked
   final int? readersCount; // 用于 read
   final int? userId;       // 操作用户
+  final Map<String, dynamic>? boostData; // 用于 boostAdded
+  final int? boostId;     // 用于 boostRemoved
 
   const PostUpdate({
     required this.postId,
@@ -96,6 +100,8 @@ class PostUpdate {
     this.likesCount,
     this.readersCount,
     this.userId,
+    this.boostData,
+    this.boostId,
   });
 }
 

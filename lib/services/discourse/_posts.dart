@@ -411,4 +411,42 @@ mixin _PostsMixin on _DiscourseServiceBase {
       return Response(requestOptions: RequestOptions());
     });
   }
+
+  // ==================== Boost ====================
+
+  /// 创建 Boost
+  Future<Boost> createBoost(int postId, String raw) async {
+    final response = await _dio.post(
+      '/discourse-boosts/posts/$postId/boosts',
+      data: {'raw': raw},
+      options: Options(contentType: Headers.formUrlEncodedContentType),
+    );
+    return Boost.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// 删除 Boost
+  Future<void> deleteBoost(int boostId) async {
+    await _dio.delete('/discourse-boosts/boosts/$boostId');
+  }
+
+  /// 获取 Boost 详情（包含权限信息）
+  Future<Boost> getBoost(int boostId) async {
+    final response = await _dio.get('/discourse-boosts/boosts/$boostId');
+    return Boost.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// 举报 Boost
+  Future<void> flagBoost(int boostId, {required int flagTypeId, String? message}) async {
+    final data = <String, dynamic>{
+      'flag_type_id': flagTypeId,
+    };
+    if (message != null && message.isNotEmpty) {
+      data['message'] = message;
+    }
+    await _dio.post(
+      '/discourse-boosts/boosts/$boostId/flags',
+      data: data,
+      options: Options(contentType: Headers.formUrlEncodedContentType),
+    );
+  }
 }

@@ -10762,6 +10762,72 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'共 {count} 行'**
   String table_rowCount(int count);
+
+  /// No description provided for @boost_placeholder.
+  ///
+  /// In zh, this message translates to:
+  /// **'说点什么...'**
+  String get boost_placeholder;
+
+  /// No description provided for @boost_send.
+  ///
+  /// In zh, this message translates to:
+  /// **'发送'**
+  String get boost_send;
+
+  /// No description provided for @boost_deleteConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'确定要删除这条 Boost 吗？'**
+  String get boost_deleteConfirm;
+
+  /// No description provided for @boost_deleted.
+  ///
+  /// In zh, this message translates to:
+  /// **'Boost 已删除'**
+  String get boost_deleted;
+
+  /// No description provided for @boost_created.
+  ///
+  /// In zh, this message translates to:
+  /// **'Boost 已发送'**
+  String get boost_created;
+
+  /// No description provided for @boost_failed.
+  ///
+  /// In zh, this message translates to:
+  /// **'Boost 发送失败'**
+  String get boost_failed;
+
+  /// No description provided for @boost_deleteFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'Boost 删除失败'**
+  String get boost_deleteFailed;
+
+  /// No description provided for @boost_flagTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'举报 Boost'**
+  String get boost_flagTitle;
+
+  /// No description provided for @boost_flagSubmitted.
+  ///
+  /// In zh, this message translates to:
+  /// **'举报已提交'**
+  String get boost_flagSubmitted;
+
+  /// No description provided for @boost_tooLong.
+  ///
+  /// In zh, this message translates to:
+  /// **'内容过长，最多 {count} 个字符'**
+  String boost_tooLong(int count);
+
+  /// No description provided for @boost_limitReached.
+  ///
+  /// In zh, this message translates to:
+  /// **'此帖子的 Boost 数量已达上限'**
+  String get boost_limitReached;
 }
 
 class _AppLocalizationsDelegate

@@ -5760,6 +5760,41 @@ class AppLocalizationsZh extends AppLocalizations {
   String table_rowCount(int count) {
     return '共 $count 行';
   }
+
+  @override
+  String get boost_placeholder => '说点什么...';
+
+  @override
+  String get boost_send => '发送';
+
+  @override
+  String get boost_deleteConfirm => '确定要删除这条 Boost 吗？';
+
+  @override
+  String get boost_deleted => 'Boost 已删除';
+
+  @override
+  String get boost_created => 'Boost 已发送';
+
+  @override
+  String get boost_failed => 'Boost 发送失败';
+
+  @override
+  String get boost_deleteFailed => 'Boost 删除失败';
+
+  @override
+  String get boost_flagTitle => '举报 Boost';
+
+  @override
+  String get boost_flagSubmitted => '举报已提交';
+
+  @override
+  String boost_tooLong(int count) {
+    return '内容过长，最多 $count 个字符';
+  }
+
+  @override
+  String get boost_limitReached => '此帖子的 Boost 数量已达上限';
 }
 
 /// The translations for Chinese, as used in Hong Kong (`zh_HK`).

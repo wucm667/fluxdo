@@ -152,6 +152,20 @@ class TopicChannelNotifier extends Notifier<TopicChannelState> {
           debugPrint('[TopicChannel] 用户被移出私信');
           break;
 
+        case 'boost_added':
+          if (postId != null) {
+            final boostData = data['boost'] as Map<String, dynamic>?;
+            _addBoostUpdate(postId, TopicMessageType.boostAdded, boostData: boostData);
+          }
+          break;
+
+        case 'boost_removed':
+          if (postId != null) {
+            final boostId = data['boost_id'] as int?;
+            _addBoostUpdate(postId, TopicMessageType.boostRemoved, boostId: boostId);
+          }
+          break;
+
         default:
           debugPrint('[TopicChannel] 未知消息类型: $type');
       }
@@ -309,6 +323,27 @@ class TopicChannelNotifier extends Notifier<TopicChannelState> {
     state = state.copyWith(postUpdates: updates);
   }
   
+  void _addBoostUpdate(
+    int postId,
+    TopicMessageType type, {
+    Map<String, dynamic>? boostData,
+    int? boostId,
+  }) {
+    final updates = List<PostUpdate>.from(state.postUpdates);
+    final update = PostUpdate(
+      postId: postId,
+      type: type,
+      updatedAt: DateTime.now(),
+      boostData: boostData,
+      boostId: boostId,
+    );
+    updates.add(update);
+    if (updates.length > 50) {
+      updates.removeAt(0);
+    }
+    state = state.copyWith(postUpdates: updates);
+  }
+
   void clearPostUpdates() {
     state = state.copyWith(postUpdates: []);
   }

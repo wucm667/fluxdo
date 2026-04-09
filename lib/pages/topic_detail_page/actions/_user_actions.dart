@@ -437,6 +437,16 @@ extension _UserActions on _TopicDetailPageState {
       case TopicMessageType.unliked:
         notifier.updatePostLikes(update.postId, likesCount: update.likesCount);
         break;
+      case TopicMessageType.boostAdded:
+        if (update.boostData != null) {
+          notifier.addBoostToPost(update.postId, update.boostData!);
+        }
+        break;
+      case TopicMessageType.boostRemoved:
+        if (update.boostId != null) {
+          notifier.removeBoostFromPost(update.postId, update.boostId!);
+        }
+        break;
       default:
         break;
     }

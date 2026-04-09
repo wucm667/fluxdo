@@ -2163,5 +2163,23 @@
         "type": "int"
       }
     }
-  }
+  },
+  "boost_placeholder": "说点什么...",
+  "boost_send": "发送",
+  "boost_deleteConfirm": "确定要删除这条 Boost 吗？",
+  "boost_deleted": "Boost 已删除",
+  "boost_created": "Boost 已发送",
+  "boost_failed": "Boost 发送失败",
+  "boost_deleteFailed": "Boost 删除失败",
+  "boost_flagTitle": "举报 Boost",
+  "boost_flagSubmitted": "举报已提交",
+  "boost_tooLong": "内容过长，最多 {count} 个字符",
+  "@boost_tooLong": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "boost_limitReached": "此帖子的 Boost 数量已达上限"
 }
