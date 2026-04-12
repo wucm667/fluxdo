@@ -1,193 +1,489 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../l10n/s.dart';
+import 'package:popover/popover.dart';
+
 import '../../../models/topic.dart';
-import '../../../providers/discourse_providers.dart';
-import '../../../services/discourse/discourse_service.dart';
-import '../../../services/toast_service.dart';
+import '../../../utils/emoji_shortcodes.dart';
 import 'boost_bubble.dart';
-import 'boost_input.dart';
+import 'boost_content.dart';
 
 /// Boost 气泡列表
-class BoostList extends ConsumerStatefulWidget {
-  final Post post;
-  final void Function(Post updatedPost)? onPostUpdated;
+class BoostList extends StatefulWidget {
+  final List<Boost> boosts;
+  final bool canBoost;
+  final VoidCallback? onAddBoost;
+  final void Function(Boost boost)? onBoostTap;
 
   const BoostList({
     super.key,
-    required this.post,
-    this.onPostUpdated,
+    required this.boosts,
+    required this.canBoost,
+    this.onAddBoost,
+    this.onBoostTap,
   });
 
   @override
-  ConsumerState<BoostList> createState() => _BoostListState();
+  State<BoostList> createState() => _BoostListState();
 }
 
-class _BoostListState extends ConsumerState<BoostList> {
-  final DiscourseService _service = DiscourseService();
-  late List<Boost> _boosts;
-  late bool _canBoost;
+class _BoostListState extends State<BoostList> {
+  static const int _collapsedMaxLines = 2;
+  static const double _chipSpacing = 6;
+  static const double _controlChipWidth = 28;
+
+  bool _showAllRows = false;
+  String? _activeGroupKey;
+  BuildContext? _activePopoverContext;
 
   @override
-  void initState() {
-    super.initState();
-    _boosts = List.from(widget.post.boosts ?? []);
-    _canBoost = widget.post.canBoost;
-  }
-
-  @override
-  void didUpdateWidget(BoostList oldWidget) {
+  void didUpdateWidget(covariant BoostList oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.post != widget.post) {
-      _boosts = List.from(widget.post.boosts ?? []);
-      _canBoost = widget.post.canBoost;
+    final activeGroupKey = _activeGroupKey;
+    if (activeGroupKey == null) {
+      return;
+    }
+
+    final oldGroup = _findGroupByKey(groupBoostsByContent(oldWidget.boosts), activeGroupKey);
+    final newGroup = _findGroupByKey(groupBoostsByContent(widget.boosts), activeGroupKey);
+    final shouldClosePopover = newGroup == null ||
+        (oldGroup != null &&
+            _groupSignature(oldGroup) != _groupSignature(newGroup));
+
+    if (shouldClosePopover) {
+      _closeActivePopover();
+      _activeGroupKey = null;
     }
   }
 
-  Future<void> _openInput() async {
-    final raw = await showBoostInputSheet(context);
-    if (raw == null || raw.isEmpty || !mounted) return;
-    await _createBoost(raw);
+  BoostGroup? _findGroupByKey(List<BoostGroup> groups, String groupingKey) {
+    for (final group in groups) {
+      if (group.groupingKey == groupingKey) {
+        return group;
+      }
+    }
+    return null;
   }
 
-  Future<void> _createBoost(String raw) async {
+  String _groupSignature(BoostGroup group) {
+    final ids = group.boosts.map((boost) => boost.id).join(',');
+    return '${group.groupingKey}|$ids';
+  }
+
+  @override
+  void dispose() {
+    _activePopoverContext = null;
+    super.dispose();
+  }
+
+  void _closeActivePopover() {
+    final popoverContext = _activePopoverContext;
+    if (popoverContext == null) {
+      return;
+    }
+
+    _activePopoverContext = null;
     try {
-      final boost = await _service.createBoost(widget.post.id, raw);
-      if (!mounted) return;
-      setState(() {
-        _boosts.add(boost);
-        _canBoost = false;
-      });
-      _notifyUpdate();
-      ToastService.showSuccess(S.current.boost_created);
-    } catch (e) {
-      if (!mounted) return;
-      ToastService.showError(S.current.boost_failed);
-    }
+      Navigator.of(popoverContext).pop();
+    } catch (_) {}
   }
 
-  Future<void> _deleteBoost(Boost boost) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        content: Text(S.current.boost_deleteConfirm),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(S.current.common_cancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(S.current.common_delete, style: const TextStyle(color: Colors.red)),
+  void _toggleRows() {
+    if (_showAllRows) {
+      _closeActivePopover();
+      setState(() {
+        _showAllRows = false;
+        _activeGroupKey = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _showAllRows = true;
+    });
+  }
+
+  Future<void> _toggleGroupPopover(
+    BuildContext anchorContext,
+    BoostGroup group,
+  ) async {
+    if (group.count <= 1) {
+      widget.onBoostTap?.call(group.boosts.first);
+      return;
+    }
+
+    if (_activeGroupKey == group.groupingKey && _activePopoverContext != null) {
+      _closeActivePopover();
+      if (mounted) {
+        setState(() => _activeGroupKey = null);
+      }
+      return;
+    }
+
+    _closeActivePopover();
+
+    if (mounted) {
+      setState(() {
+        _activeGroupKey = group.groupingKey;
+      });
+    }
+
+    final theme = Theme.of(anchorContext);
+
+    try {
+      await showPopover(
+        context: anchorContext,
+        bodyBuilder: (popoverContext) {
+          _activePopoverContext = popoverContext;
+          return _BoostPopoverContent(
+            boosts: group.boosts,
+            onBoostTap: (boost) {
+              Navigator.of(popoverContext).pop();
+              widget.onBoostTap?.call(boost);
+            },
+          );
+        },
+        direction: PopoverDirection.bottom,
+        arrowHeight: 8,
+        arrowWidth: 12,
+        backgroundColor: theme.colorScheme.surface,
+        barrierColor: Colors.transparent,
+        radius: 8,
+        shadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
-    try {
-      await _service.deleteBoost(boost.id);
-      if (!mounted) return;
-      setState(() {
-        _boosts.removeWhere((b) => b.id == boost.id);
-        // 删除自己的 boost 后恢复 canBoost
-        final currentUser = ref.read(currentUserProvider).value;
-        if (currentUser != null && boost.user.username == currentUser.username) {
-          _canBoost = true;
-        }
-      });
-      _notifyUpdate();
-      ToastService.showSuccess(S.current.boost_deleted);
-    } catch (_) {
-      if (!mounted) return;
-      ToastService.showError(S.current.boost_deleteFailed);
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          if (_activeGroupKey == group.groupingKey) {
+            _activeGroupKey = null;
+          }
+          _activePopoverContext = null;
+        });
+      } else {
+        _activePopoverContext = null;
+      }
     }
   }
 
-  void _showBoostActions(Boost boost) {
-    final currentUser = ref.read(currentUserProvider).value;
-    final isOwn = currentUser != null && boost.user.username == currentUser.username;
+  _WrapEntry _buildGroupEntry(BuildContext context, BoostGroup group) {
+    if (group.count == 1) {
+      final boost = group.boosts.first;
+      return _WrapEntry(
+        width: _estimateSingleBubbleWidth(context, group.displayText),
+        child: BoostBubble(
+          boost: boost,
+          onTap: widget.onBoostTap == null ? null : () => widget.onBoostTap!(boost),
+          onLongPress: widget.onBoostTap == null ? null : () => widget.onBoostTap!(boost),
+        ),
+      );
+    }
 
-    if (!isOwn && !boost.canDelete) return;
+    return _WrapEntry(
+      width: _estimateGroupedBubbleWidth(context, group),
+      child: BoostBubble.group(
+        group: group,
+        expanded: _activeGroupKey == group.groupingKey,
+        onTapWithContext: (anchorContext) {
+          unawaited(_toggleGroupPopover(anchorContext, group));
+        },
+        onLongPressWithContext: (anchorContext) {
+          unawaited(_toggleGroupPopover(anchorContext, group));
+        },
+      ),
+    );
+  }
 
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.red),
-                title: Text(S.current.common_delete),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _deleteBoost(boost);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.close),
-                title: Text(S.current.common_cancel),
-                onTap: () => Navigator.pop(ctx),
-              ),
-            ],
+  _WrapEntry _buildToggleEntry(BuildContext context, bool expanded) {
+    return _WrapEntry(
+      width: _estimateControlChipWidth(),
+      child: _InlineControlChip(
+        icon: expanded ? Icons.chevron_left : Icons.chevron_right,
+        onTap: _toggleRows,
+      ),
+    );
+  }
+
+  _WrapEntry _buildAddEntry(BuildContext context) {
+    final theme = Theme.of(context);
+    return _WrapEntry(
+      width: 30,
+      child: Tooltip(
+        message: 'Boost',
+        child: GestureDetector(
+          onTap: widget.onAddBoost,
+          child: Container(
+            height: 28,
+            width: 28,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.rocket_launch_outlined,
+              size: 14,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  int _computeWrapLineCount(List<double> widths, double maxWidth) {
+    if (widths.isEmpty) {
+      return 0;
+    }
+
+    var lines = 1;
+    var currentLineWidth = 0.0;
+
+    for (final rawWidth in widths) {
+      final width = rawWidth.clamp(0.0, maxWidth);
+      final nextLineWidth =
+          currentLineWidth == 0 ? width : currentLineWidth + _chipSpacing + width;
+
+      if (nextLineWidth <= maxWidth + 0.1) {
+        currentLineWidth = nextLineWidth;
+      } else {
+        lines += 1;
+        currentLineWidth = width;
+      }
+    }
+
+    return lines;
+  }
+
+  int _maxPrefixThatFits(
+    List<_WrapEntry> entries,
+    List<_WrapEntry> trailingEntries,
+    double maxWidth,
+  ) {
+    var low = 0;
+    var high = entries.length;
+
+    while (low < high) {
+      final mid = (low + high + 1) >> 1;
+      final widths = [
+        ...entries.take(mid).map((entry) => entry.width),
+        ...trailingEntries.map((entry) => entry.width),
+      ];
+      final lines = _computeWrapLineCount(widths, maxWidth);
+      if (lines <= _collapsedMaxLines) {
+        low = mid;
+      } else {
+        high = mid - 1;
+      }
+    }
+
+    return low;
+  }
+
+  double _estimateSingleBubbleWidth(BuildContext context, String displayText) {
+    final theme = Theme.of(context);
+    final style = theme.textTheme.bodySmall?.copyWith(height: 1.2);
+    final textWidth = _measureDisplayTextWidth(
+      context,
+      displayText,
+      style,
+    ).clamp(0.0, 220.0);
+    return 3 + 6 + 20 + 4 + textWidth;
+  }
+
+  double _estimateGroupedBubbleWidth(BuildContext context, BoostGroup group) {
+    final theme = Theme.of(context);
+    final style = theme.textTheme.bodySmall?.copyWith(height: 1.2);
+    final labelStyle = theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700);
+    final textWidth = _measureDisplayTextWidth(
+      context,
+      group.displayText,
+      style,
+    ).clamp(0.0, 180.0);
+    final countWidth = _measureRawTextWidth(
+      context,
+      '${group.count}',
+      labelStyle,
+    );
+    final avatarWidth = _estimateAvatarStackWidth(group);
+    // 3+6 (bubble padding) + avatarWidth + 4 (avatar-text spacing) + textWidth 
+    // + 6 (spacing) + countWidth + 12 (pill padding) + 4 (spacing) + 14 (arrow)
+    return 3 + 6 + avatarWidth + 4 + textWidth + 6 + countWidth + 12 + 4 + 14;
+  }
+
+  double _estimateControlChipWidth() {
+    return _controlChipWidth;
+  }
+
+  double _estimateAvatarStackWidth(BoostGroup group) {
+    final userCount = group.boosts.map((boost) => boost.user.id).toSet().length.clamp(1, 3);
+    return userCount == 1 ? 20.0 : 20.0 + (userCount - 1) * 12.0;
+  }
+
+  double _measureDisplayTextWidth(
+    BuildContext context,
+    String text,
+    TextStyle? style,
+  ) {
+    final measurementText = text.replaceAllMapped(emojiShortcodeRegex, (_) => '◯');
+    return _measureRawTextWidth(context, measurementText, style);
+  }
+
+  double _measureRawTextWidth(
+    BuildContext context,
+    String text,
+    TextStyle? style,
+  ) {
+    final painter = TextPainter(
+      text: TextSpan(text: text.isEmpty ? 'Boost' : text, style: style),
+      textDirection: Directionality.of(context),
+      maxLines: 1,
+    )..layout();
+
+    return painter.width;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final groups = groupBoostsByContent(widget.boosts);
+    final groupEntries = groups.map((group) => _buildGroupEntry(context, group)).toList();
+    final addEntry = widget.canBoost ? _buildAddEntry(context) : null;
+
+    if (groupEntries.isEmpty && addEntry == null) {
+      return const SizedBox.shrink();
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        final baseEntries = [
+          ...groupEntries,
+          ...?(addEntry == null ? null : [addEntry]),
+        ];
+        final hasOverflow =
+            _computeWrapLineCount(baseEntries.map((entry) => entry.width).toList(), maxWidth) >
+                _collapsedMaxLines;
+
+        final visibleEntries = <_WrapEntry>[];
+
+        if (_showAllRows || !hasOverflow) {
+          visibleEntries.addAll(groupEntries);
+          if (hasOverflow) {
+            visibleEntries.add(_buildToggleEntry(context, true));
+          }
+          if (addEntry != null) {
+            visibleEntries.add(addEntry);
+          }
+        } else {
+          final trailingEntries = <_WrapEntry>[
+            _buildToggleEntry(context, false),
+            ...?(addEntry == null ? null : [addEntry]),
+          ];
+          final prefix = _maxPrefixThatFits(groupEntries, trailingEntries, maxWidth);
+          visibleEntries.addAll(groupEntries.take(prefix));
+          visibleEntries.addAll(trailingEntries);
+        }
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Wrap(
+            spacing: _chipSpacing,
+            runSpacing: _chipSpacing,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: visibleEntries.map((entry) => entry.child).toList(growable: false),
           ),
         );
       },
     );
   }
+}
 
-  void _notifyUpdate() {
-    widget.onPostUpdated?.call(widget.post.copyWith(
-      boosts: List.from(_boosts),
-      canBoost: _canBoost,
-    ));
-  }
+class _WrapEntry {
+  final Widget child;
+  final double width;
+
+  const _WrapEntry({
+    required this.child,
+    required this.width,
+  });
+}
+
+class _InlineControlChip extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  const _InlineControlChip({
+    required this.icon,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hasBoosts = _boosts.isNotEmpty;
+    return Semantics(
+      button: true,
+      label: icon == Icons.chevron_left ? '收起' : '展开',
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: _BoostListState._controlChipWidth,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Icon(
+            icon,
+            size: 16,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-    if (!hasBoosts && !_canBoost) return const SizedBox.shrink();
+class _BoostPopoverContent extends StatelessWidget {
+  final List<Boost> boosts;
+  final void Function(Boost boost)? onBoostTap;
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Wrap(
-        spacing: 6,
-        runSpacing: 6,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          // 现有 Boost 气泡
-          for (final boost in _boosts)
-            BoostBubble(
-              boost: boost,
-              onTap: () => _showBoostActions(boost),
-              onLongPress: () => _showBoostActions(boost),
-            ),
+  const _BoostPopoverContent({
+    required this.boosts,
+    this.onBoostTap,
+  });
 
-          // 添加按钮
-          if (_canBoost)
-            Tooltip(
-              message: 'Boost',
-              child: GestureDetector(
-                onTap: _openInput,
-                child: Container(
-                  height: 30,
-                  width: 30,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.rocket_launch_outlined,
-                    size: 14,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+  @override
+  Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    return Material(
+      color: Colors.transparent,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: screenHeight * 0.3,
+          maxWidth: (screenWidth * 0.88).clamp(0.0, 420.0),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final boost in boosts)
+                BoostBubble(
+                  boost: boost,
+                  onTap: onBoostTap == null ? null : () => onBoostTap!(boost),
+                  onLongPress: onBoostTap == null ? null : () => onBoostTap!(boost),
                 ),
-              ),
-            ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'preloaded_data_service.dart';
 import '../utils/url_helper.dart';
+import '../utils/emoji_shortcodes.dart';
 
 /// Emoji URL 解析器
 ///
@@ -43,10 +44,8 @@ class EmojiHandler {
 
   /// 将文本中的 :emoji: 替换为 HTML img 标签
   String replaceEmojis(String text) {
-    final regex = RegExp(r':([a-zA-Z0-9_+-]+):');
-
-    return text.replaceAllMapped(regex, (match) {
-      final name = match.group(1)!;
+    return text.replaceAllMapped(emojiShortcodeRegex, (match) {
+      final name = normalizeEmojiShortcodeName(match.group(1)!);
       final fullUrl = getEmojiUrl(name);
       return '<img src="$fullUrl" alt=":$name:" class="emoji" title=":$name:">';
     });
@@ -57,12 +56,26 @@ class EmojiHandler {
   /// 优先查找自定义 emoji（有服务端提供的真实 URL），
   /// 未找到则使用标准 emoji 的确定性路径。
   String getEmojiUrl(String name) {
+    final normalized = normalizeEmojiShortcodeName(name);
+
     // 优先查自定义 emoji（如 bili_114、tsai 等）
-    final customUrl = _customEmojiMap?[name];
+    final customUrl = _customEmojiMap?[normalized];
     if (customUrl != null) {
       return UrlHelper.resolveUrlWithCdn(customUrl);
     }
+
+    final toneMatch = RegExp(r'^([^\s:]+):t([1-6])$').firstMatch(normalized);
+    if (toneMatch != null) {
+      final base = toneMatch.group(1)!;
+      final tone = toneMatch.group(2)!;
+      return UrlHelper.resolveUrlWithCdn(
+        '/images/emoji/twitter/$base/t$tone.png?v=12',
+      );
+    }
+
     // 标准 emoji，URL 确定性拼接（与 Discourse buildEmojiUrl 一致）
-    return UrlHelper.resolveUrlWithCdn('/images/emoji/twitter/$name.png?v=12');
+    return UrlHelper.resolveUrlWithCdn(
+      '/images/emoji/twitter/$normalized.png?v=12',
+    );
   }
 }

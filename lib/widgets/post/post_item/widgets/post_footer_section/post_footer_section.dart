@@ -130,14 +130,14 @@ class _PostFooterSectionState extends ConsumerState<PostFooterSection> {
     _bookmarkName = widget.post.bookmarkName;
     _bookmarkReminderAt = widget.post.bookmarkReminderAt;
     _isAcceptedAnswer = widget.post.acceptedAnswer;
-    _boosts = List.from(widget.post.boosts ?? []);
+    _boosts = _dedupeBoostsById(widget.post.boosts ?? const []);
     _canBoost = widget.post.canBoost;
   }
 
   Future<void> _handleBoostCreated(Boost boost) async {
     if (!mounted) return;
     setState(() {
-      _boosts.add(boost);
+      _boosts = _dedupeBoostsById([..._boosts, boost]);
       _canBoost = false;
     });
     widget.onBoostUpdated?.call(widget.post.copyWith(
@@ -159,6 +159,80 @@ class _PostFooterSectionState extends ConsumerState<PostFooterSection> {
       boosts: List.from(_boosts),
       canBoost: _canBoost,
     ));
+  }
+
+  List<Boost> _dedupeBoostsById(List<Boost> boosts) {
+    final byId = <int, Boost>{};
+    for (final boost in boosts) {
+      byId[boost.id] = boost;
+    }
+    return byId.values.toList(growable: false);
+  }
+
+  Future<void> _deleteBoost(Boost boost) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        content: Text(S.current.boost_deleteConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(S.current.common_cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              S.current.common_delete,
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await _service.deleteBoost(boost.id);
+      if (!mounted) return;
+      _handleBoostDeleted(boost);
+      ToastService.showSuccess(S.current.boost_deleted);
+    } catch (_) {
+      if (!mounted) return;
+      ToastService.showError(S.current.boost_deleteFailed);
+    }
+  }
+
+  void _showBoostActions(Boost boost) {
+    final currentUser = ref.read(currentUserProvider).value;
+    final isOwn = currentUser != null && boost.user.username == currentUser.username;
+
+    if (!isOwn && !boost.canDelete) return;
+
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: Text(S.current.common_delete),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _deleteBoost(boost);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.close),
+                title: Text(S.current.common_cancel),
+                onTap: () => Navigator.pop(ctx),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _openBoostInput() async {
@@ -232,8 +306,10 @@ class _PostFooterSectionState extends ConsumerState<PostFooterSection> {
           // Boost 气泡列表
           if (_boosts.isNotEmpty)
             BoostList(
-              post: widget.post,
-              onPostUpdated: widget.onBoostUpdated,
+              boosts: _boosts,
+              canBoost: _canBoost,
+              onAddBoost: _openBoostInput,
+              onBoostTap: _showBoostActions,
             ),
           ValueListenableBuilder<bool>(
             valueListenable: _showRepliesNotifier,

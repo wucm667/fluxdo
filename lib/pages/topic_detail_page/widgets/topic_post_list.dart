@@ -303,6 +303,23 @@ class _TopicPostListState extends State<TopicPostList> {
     return result;
   }
 
+  String _segmentKey(_PostRenderSegment segment) {
+    switch (segment.type) {
+      case _PostRenderSegmentType.shortPost:
+        return 'post-${segment.post.id}';
+      case _PostRenderSegmentType.longHeader:
+        return 'long-header-${segment.post.id}';
+      case _PostRenderSegmentType.longChunk:
+        return 'long-chunk-${segment.post.id}-${segment.chunkIndex}';
+      case _PostRenderSegmentType.longFooter:
+        return 'long-footer-${segment.post.id}';
+      case _PostRenderSegmentType.gapBefore:
+        return 'gap-before-${segment.post.id}';
+      case _PostRenderSegmentType.gapAfter:
+        return 'gap-after-${segment.post.id}';
+    }
+  }
+
   /// 在大屏上为内容添加宽度约束
   Widget _wrapContent(BuildContext context, Widget child) {
     if (Responsive.isMobile(context)) return child;
@@ -751,7 +768,7 @@ class _TopicPostListState extends State<TopicPostList> {
     final wrapped = _wrapContent(
       context,
       AutoScrollTag(
-        key: ValueKey('segment-${segment.scrollIndex}-${post.postNumber}'),
+        key: ValueKey(_segmentKey(segment)),
         controller: scrollController,
         index: segment.scrollIndex,
         child: segment.type == _PostRenderSegmentType.shortPost

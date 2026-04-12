@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/emoji_handler.dart';
 import '../../services/discourse_cache_manager.dart';
+import '../../utils/emoji_shortcodes.dart';
 
 /// 轻量级 Emoji 文本组件
 /// 
@@ -25,7 +26,7 @@ class EmojiText extends StatelessWidget {
   });
 
   // 匹配 :emoji_name: 模式
-  static final RegExp emojiRegex = RegExp(r':([a-zA-Z0-9_+-]+):');
+  static final RegExp emojiRegex = emojiShortcodeRegex;
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +60,12 @@ class EmojiText extends StatelessWidget {
 
   /// 静态方法：构建包含 emoji 的 spans 列表
   /// 可被其他组件复用
-  static List<InlineSpan> buildEmojiSpans(BuildContext context, String text, TextStyle? style) {
+  static List<InlineSpan> buildEmojiSpans(
+    BuildContext context,
+    String text,
+    TextStyle? style, {
+    bool preserveSourceLength = false,
+  }) {
     final matches = emojiRegex.allMatches(text);
     
     if (matches.isEmpty) {
@@ -78,6 +84,14 @@ class EmojiText extends StatelessWidget {
       // 添加 emoji 图片
       final emojiName = match.group(1)!;
       spans.add(_buildEmojiWidgetSpan(context, emojiName, style));
+      if (preserveSourceLength && match.end - match.start > 1) {
+        spans.add(
+          TextSpan(
+            text: '\u2060' * (match.end - match.start - 1),
+            style: style?.copyWith(color: Colors.transparent),
+          ),
+        );
+      }
 
       lastEnd = match.end;
     }

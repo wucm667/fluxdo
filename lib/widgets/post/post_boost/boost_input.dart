@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/s.dart';
 import '../../../models/emoji.dart';
+import '../../../utils/emoji_shortcodes.dart';
 import '../../../utils/platform_utils.dart';
+import '../../common/emoji_text.dart';
 import '../../markdown_editor/emoji_picker.dart';
 
 /// 以底部浮层方式显示 Boost 输入框
@@ -22,29 +24,62 @@ class _BoostInputSheet extends ConsumerStatefulWidget {
   ConsumerState<_BoostInputSheet> createState() => _BoostInputSheetState();
 }
 
+class _BoostTextEditingController extends TextEditingController {
+  @override
+  TextSpan buildTextSpan({
+    required BuildContext context,
+    TextStyle? style,
+    required bool withComposing,
+  }) {
+    final hasEmojiShortcode = emojiShortcodeRegex.hasMatch(text);
+    final hasComposingRegion =
+        withComposing && value.composing.isValid && !value.composing.isCollapsed;
+
+    if (!hasEmojiShortcode || hasComposingRegion) {
+      return super.buildTextSpan(
+        context: context,
+        style: style,
+        withComposing: withComposing,
+      );
+    }
+
+    return TextSpan(
+      style: style,
+      children: EmojiText.buildEmojiSpans(
+        context,
+        text,
+        style,
+        preserveSourceLength: true,
+      ),
+    );
+  }
+}
+
 class _BoostInputSheetState extends ConsumerState<_BoostInputSheet> {
-  final _controller = TextEditingController();
+  final _controller = _BoostTextEditingController();
   final _focusNode = FocusNode();
   // 默认展开表情面板，避免浮层过小
   bool _showEmojiPanel = true;
+  bool _normalizingSelection = false;
 
   static const int _maxVisibleLength = 16;
 
   @override
   void initState() {
     super.initState();
+    _controller.addListener(_normalizeSelectionIfNeeded);
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_normalizeSelectionIfNeeded);
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
   int get _visibleLength {
-    final text = _controller.text;
-    return text.replaceAll(RegExp(r':[a-z0-9_+-]+:'), 'x').length;
+    return visibleLengthWithEmojiShortcodes(_controller.text);
   }
 
   bool get _canSubmit => _controller.text.trim().isNotEmpty && _visibleLength <= _maxVisibleLength;
@@ -54,9 +89,37 @@ class _BoostInputSheetState extends ConsumerState<_BoostInputSheet> {
     Navigator.pop(context, _controller.text.trim());
   }
 
+  void _normalizeSelectionIfNeeded() {
+    if (_normalizingSelection) {
+      return;
+    }
+
+    final selection = _controller.selection;
+    final normalizedSelection = normalizeEmojiShortcodeSelection(
+      _controller.text,
+      selection,
+      preferEnd: true,
+    );
+    if (normalizedSelection == selection) {
+      return;
+    }
+
+    _normalizingSelection = true;
+    _controller.value = _controller.value.copyWith(
+      selection: normalizedSelection,
+      composing: TextRange.empty,
+    );
+    _normalizingSelection = false;
+  }
+
   void _insertEmoji(Emoji emoji) {
     final text = _controller.text;
-    final selection = _controller.selection;
+    final selection = normalizeEmojiShortcodeSelection(
+      text,
+      _controller.selection,
+      expandSelection: true,
+      preferEnd: true,
+    );
     final shortcode = ':${emoji.name}:';
 
     final start = selection.start >= 0 ? selection.start : text.length;
@@ -124,8 +187,9 @@ class _BoostInputSheetState extends ConsumerState<_BoostInputSheet> {
                   child: TextField(
                     controller: _controller,
                     focusNode: _focusNode,
+                    inputFormatters: const [EmojiShortcodeDeleteFormatter()],
                     style: theme.textTheme.bodyMedium,
-                    maxLength: 30,
+                    textInputAction: TextInputAction.send,
                     decoration: InputDecoration(
                       isDense: true,
                       filled: true,
