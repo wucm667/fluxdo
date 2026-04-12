@@ -480,6 +480,9 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
         ? jarToken
         : webViewToken;
     final tokenMatch = jarToken == webViewToken;
+    final jarSessionCookies = await _cookieJar.getSessionCookieDiagnosticsForRequest(
+      uri: Uri.parse(AppConstants.baseUrl),
+    );
     LogWriter.instance.write({
       'timestamp': DateTime.now().toIso8601String(),
       'level': tokenMatch ? 'info' : 'warning',
@@ -493,6 +496,7 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
       'finalTokenLen': finalToken.length,
       'tokenMatch': tokenMatch,
       'jarTokenMissing': jarToken == null || jarToken.isEmpty,
+      'jarSessionCookies': jarSessionCookies,
     });
     if (!tokenMatch) {
       debugPrint(
@@ -518,6 +522,9 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
 
       final jarToken = await _cookieJar.getTToken();
       final tokenMatch = jarToken == token;
+      final jarSessionCookies = await _cookieJar.getSessionCookieDiagnosticsForRequest(
+        uri: Uri.parse(AppConstants.baseUrl),
+      );
       LogWriter.instance.write({
         'timestamp': DateTime.now().toIso8601String(),
         'level': 'info',
@@ -528,6 +535,7 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
         'webViewTokenLen': token.length,
         'tokenMatch': tokenMatch,
         'currentUrl': currentUrl,
+        'jarSessionCookies': jarSessionCookies,
       });
     } catch (e) {
       debugPrint('[Login] 登录态后台收尾失败: $e');

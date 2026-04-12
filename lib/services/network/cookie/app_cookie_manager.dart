@@ -27,7 +27,7 @@ class AppCookieManager extends Interceptor {
 
   static final _setCookieReg = RegExp('(?<=)(,)(?=[^;]+?=)');
 
-  /// Merge cookies into a Cookie string.
+  /// Select cookies for a request.
   /// Cookies with longer paths are listed before cookies with shorter paths.
   /// 同名 cookie 去重：优先保留 host-only cookie，避免重复发送。
   ///
@@ -35,22 +35,23 @@ class AppCookieManager extends Interceptor {
   /// 代表服务器最新轮换的值（如 _t 会话 token）。
   /// domain cookie 来自 syncFromWebView（WKWebView 自动添加 domain），
   /// 可能是旧值。优先 host-only 确保发送服务器最新认可的值。
-  static String _mergeCookies(List<Cookie> cookies, Uri uri) {
+  static List<Cookie> _selectCookies(List<Cookie> cookies, Uri uri) {
     final requestHost = uri.host.toLowerCase();
-    cookies.sort((a, b) {
-      if (a.path == null && b.path == null) {
-        return 0;
-      } else if (a.path == null) {
-        return -1;
-      } else if (b.path == null) {
-        return 1;
-      } else {
-        return b.path!.length.compareTo(a.path!.length);
-      }
-    });
+    final sortedCookies = [...cookies]
+      ..sort((a, b) {
+        if (a.path == null && b.path == null) {
+          return 0;
+        } else if (a.path == null) {
+          return -1;
+        } else if (b.path == null) {
+          return 1;
+        } else {
+          return b.path!.length.compareTo(a.path!.length);
+        }
+      });
 
     final selected = <String, Cookie>{};
-    for (final cookie in cookies) {
+    for (final cookie in sortedCookies) {
       final key = '${cookie.name}|${cookie.path ?? '/'}';
       final existing = selected[key];
       if (existing == null ||
@@ -68,7 +69,7 @@ class AppCookieManager extends Interceptor {
         return _compareCookiePriority(b, a, requestHost);
       });
 
-    return deduped.map((cookie) => '${cookie.name}=${CookieValueCodec.decode(cookie.value)}').join('; ');
+    return deduped;
   }
 
   static int _compareCookiePriority(
@@ -263,11 +264,16 @@ class AppCookieManager extends Interceptor {
       });
     }
 
-    final cookies = _mergeCookies(requestCookies, options.uri);
+    final selectedCookies = _selectCookies(requestCookies, options.uri);
+    final cookies = selectedCookies
+        .map(
+          (cookie) =>
+              '${cookie.name}=${CookieValueCodec.decode(cookie.value)}',
+        )
+        .join('; ');
     if (tCookies.isNotEmpty) {
-      final selectedTCookies = cookies
-          .split('; ')
-          .where((entry) => entry.startsWith('_t='))
+      final selectedTCookies = selectedCookies
+          .where((cookie) => cookie.name == '_t')
           .toList(growable: false);
       LogWriter.instance.write({
         'timestamp': DateTime.now().toIso8601String(),
@@ -280,7 +286,17 @@ class AppCookieManager extends Interceptor {
         'duplicateCount': tCookies.length,
         'selectedCount': selectedTCookies.length,
         'selectedTokenLengths': selectedTCookies
-            .map((entry) => entry.length - 3)
+            .map((cookie) => cookie.value.length)
+            .toList(growable: false),
+        'selectedCookies': selectedTCookies
+            .map(
+              (cookie) => {
+                'domain': cookie.domain,
+                'path': cookie.path,
+                'hostOnly': cookie.domain == null,
+                'valueLength': cookie.value.length,
+              },
+            )
             .toList(growable: false),
       });
     }

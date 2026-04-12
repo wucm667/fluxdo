@@ -409,6 +409,10 @@ mixin _AuthMixin on _DiscourseServiceBase {
     // 收集 _t cookie 诊断信息（不含实际值，仅状态）
     final jarTToken = await _cookieJar.getTToken();
     final csrfToken = _cookieSync.csrfToken;
+    final jarSessionCookies =
+        await _cookieJar.getSessionCookieDiagnosticsForRequest(
+          uri: Uri.parse(AppConstants.baseUrl),
+        );
 
     // 记录被动退出日志（含触发来源，方便排查）
     LogWriter.instance.write({
@@ -425,6 +429,7 @@ mixin _AuthMixin on _DiscourseServiceBase {
       'jarHasToken': jarTToken != null && jarTToken.isNotEmpty,
       'jarTokenLen': jarTToken?.length,
       'hasCsrf': csrfToken != null && csrfToken.isNotEmpty,
+      'jarSessionCookies': jarSessionCookies,
       // 实际请求中 Cookie header 的 _t 状态（仅 discourse-logged-out 触发时有值）
       'sentHasT': sentHasT,
       'sentTLen': sentTLen,
