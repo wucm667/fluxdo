@@ -8944,6 +8944,18 @@ abstract class AppLocalizations {
   /// **'保存到相册'**
   String get share_saveToGallery;
 
+  /// No description provided for @share_fileSaved.
+  ///
+  /// In zh, this message translates to:
+  /// **'文件已保存'**
+  String get share_fileSaved;
+
+  /// No description provided for @share_selectSaveLocation.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择保存位置'**
+  String get share_selectSaveLocation;
+
   /// No description provided for @share_screenshotFailed.
   ///
   /// In zh, this message translates to:

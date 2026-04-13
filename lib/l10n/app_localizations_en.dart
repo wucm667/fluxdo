@@ -4901,6 +4901,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get share_saveToGallery => 'Save to gallery';
 
   @override
+  String get share_fileSaved => 'File saved';
+
+  @override
+  String get share_selectSaveLocation => 'Select save location';
+
+  @override
   String get share_screenshotFailed => 'Screenshot failed';
 
   @override

@@ -4777,6 +4777,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get share_saveToGallery => '保存到相册';
 
   @override
+  String get share_fileSaved => '文件已保存';
+
+  @override
+  String get share_selectSaveLocation => '选择保存位置';
+
+  @override
   String get share_screenshotFailed => '截图失败';
 
   @override
@@ -10585,6 +10591,12 @@ class AppLocalizationsZhHk extends AppLocalizationsZh {
   String get share_saveToGallery => '保存到相冊';
 
   @override
+  String get share_fileSaved => '文件已保存';
+
+  @override
+  String get share_selectSaveLocation => '選擇保存位置';
+
+  @override
   String get share_screenshotFailed => '截圖失敗';
 
   @override
@@ -16267,6 +16279,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get share_saveToGallery => '儲存到相簿';
+
+  @override
+  String get share_fileSaved => '檔案已儲存';
+
+  @override
+  String get share_selectSaveLocation => '選擇儲存位置';
 
   @override
   String get share_screenshotFailed => '截圖失敗';
