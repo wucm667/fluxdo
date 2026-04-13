@@ -77,6 +77,9 @@ cd "${PROJECT_ROOT}"
 flutter pub get
 bash "${SCRIPT_DIR}/patch_linux_plugins.sh"
 
+echo "==> Generating l10n"
+dart run tool/merge_l10n.dart
+
 echo "==> Building Linux bundle"
 CC=gcc CXX=g++ flutter build linux --release
 

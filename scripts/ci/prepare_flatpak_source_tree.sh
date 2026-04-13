@@ -44,6 +44,9 @@ flutter precache --linux
 flutter pub get
 bash "${SCRIPT_DIR}/patch_linux_plugins.sh"
 
+echo "==> Generating l10n"
+dart run tool/merge_l10n.dart
+
 echo "==> Warming Cargokit build tool dependencies"
 DART_BIN="${FLUTTER_ROOT}/bin/cache/dart-sdk/bin/dart"
 CARGOKIT_WARM_ROOT="${ARTIFACT_ROOT}/cargokit-pub-runners"
