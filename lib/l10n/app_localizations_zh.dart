@@ -2983,6 +2983,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get notification_backgroundRunning => '正在后台运行，保持通知接收';
 
   @override
+  String notification_boost(String username) {
+    return '$username Boost 了你的帖子';
+  }
+
+  @override
+  String notification_boostWithContent(String username, String content) {
+    return '$username: $content';
+  }
+
+  @override
+  String notification_boostByMany(String username, int count) {
+    return '$username 等 $count 人 Boost 了你的帖子';
+  }
+
+  @override
   String get notification_bookmarkReminder => '书签提醒';
 
   @override
@@ -3201,6 +3216,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get notification_typeAssignedTopic => '话题指派';
+
+  @override
+  String get notification_typeBoost => 'Boost';
 
   @override
   String get notification_typeBookmarkReminder => '书签提醒';
@@ -5198,6 +5216,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get followList_following => '关注';
 
   @override
+  String get privateMessages_title => '私信';
+
+  @override
+  String get privateMessages_inbox => '最新';
+
+  @override
+  String get privateMessages_sent => '已发送';
+
+  @override
+  String get privateMessages_archive => '归档';
+
+  @override
+  String get privateMessages_empty => '暂无私信';
+
+  @override
   String get profileStats_addItems => '点击添加统计项';
 
   @override
@@ -5361,6 +5394,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get profile_metaverse => '元宇宙';
+
+  @override
+  String get profile_privateMessages => '私信';
 
   @override
   String get profile_myBadges => '我的徽章';
@@ -8816,6 +8852,21 @@ class AppLocalizationsZhHk extends AppLocalizationsZh {
   String get notification_backgroundRunning => '正在後台運行，保持通知接收';
 
   @override
+  String notification_boost(String username) {
+    return '$username Boost 了你的帖子';
+  }
+
+  @override
+  String notification_boostWithContent(String username, String content) {
+    return '$username: $content';
+  }
+
+  @override
+  String notification_boostByMany(String username, int count) {
+    return '$username 等 $count 人 Boost 了你的帖子';
+  }
+
+  @override
   String get notification_bookmarkReminder => '書籤提醒';
 
   @override
@@ -9034,6 +9085,9 @@ class AppLocalizationsZhHk extends AppLocalizationsZh {
 
   @override
   String get notification_typeAssignedTopic => '話題指派';
+
+  @override
+  String get notification_typeBoost => 'Boost';
 
   @override
   String get notification_typeBookmarkReminder => '書籤提醒';
@@ -10967,6 +11021,21 @@ class AppLocalizationsZhHk extends AppLocalizationsZh {
   String get followList_following => '關注';
 
   @override
+  String get privateMessages_title => '私訊';
+
+  @override
+  String get privateMessages_inbox => '最新';
+
+  @override
+  String get privateMessages_sent => '已發送';
+
+  @override
+  String get privateMessages_archive => '歸檔';
+
+  @override
+  String get privateMessages_empty => '暫無私訊';
+
+  @override
   String get profileStats_addItems => '點擊添加統計項';
 
   @override
@@ -11130,6 +11199,9 @@ class AppLocalizationsZhHk extends AppLocalizationsZh {
 
   @override
   String get profile_metaverse => '元宇宙';
+
+  @override
+  String get profile_privateMessages => '私訊';
 
   @override
   String get profile_myBadges => '我的徽章';
@@ -14464,6 +14536,21 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get notification_backgroundRunning => '正在後臺執行，保持通知接收';
 
   @override
+  String notification_boost(String username) {
+    return '$username Boost 了你的帖子';
+  }
+
+  @override
+  String notification_boostWithContent(String username, String content) {
+    return '$username: $content';
+  }
+
+  @override
+  String notification_boostByMany(String username, int count) {
+    return '$username 等 $count 人 Boost 了你的帖子';
+  }
+
+  @override
   String get notification_bookmarkReminder => '書籤提醒';
 
   @override
@@ -14682,6 +14769,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get notification_typeAssignedTopic => '話題指派';
+
+  @override
+  String get notification_typeBoost => 'Boost';
 
   @override
   String get notification_typeBookmarkReminder => '書籤提醒';

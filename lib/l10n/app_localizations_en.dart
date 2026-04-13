@@ -3066,6 +3066,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'Running in background for notifications';
 
   @override
+  String notification_boost(String username) {
+    return '$username boosted your post';
+  }
+
+  @override
+  String notification_boostWithContent(String username, String content) {
+    return '$username: $content';
+  }
+
+  @override
+  String notification_boostByMany(String username, int count) {
+    return '$username and $count others boosted your post';
+  }
+
+  @override
   String get notification_bookmarkReminder => 'Bookmark reminder';
 
   @override
@@ -3287,6 +3302,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notification_typeAssignedTopic => 'Topic assigned';
+
+  @override
+  String get notification_typeBoost => 'Boost';
 
   @override
   String get notification_typeBookmarkReminder => 'Bookmark reminder';
@@ -5325,6 +5343,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get followList_following => 'Following';
 
   @override
+  String get privateMessages_title => 'Messages';
+
+  @override
+  String get privateMessages_inbox => 'Inbox';
+
+  @override
+  String get privateMessages_sent => 'Sent';
+
+  @override
+  String get privateMessages_archive => 'Archive';
+
+  @override
+  String get privateMessages_empty => 'No messages';
+
+  @override
   String get profileStats_addItems => 'Tap to add stats';
 
   @override
@@ -5491,6 +5524,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profile_metaverse => 'Metaverse';
+
+  @override
+  String get profile_privateMessages => 'Messages';
 
   @override
   String get profile_myBadges => 'My badges';

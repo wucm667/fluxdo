@@ -3,6 +3,26 @@
   "notification_adminNewSuggestions": "New suggestions in site dashboard",
   "notification_assignedTopic": "Topic assigned to you",
   "notification_backgroundRunning": "Running in background for notifications",
+  "notification_boost": "{username} boosted your post",
+  "@notification_boost": {
+    "placeholders": {
+      "username": {"type": "String"}
+    }
+  },
+  "notification_boostWithContent": "{username}: {content}",
+  "@notification_boostWithContent": {
+    "placeholders": {
+      "username": {"type": "String"},
+      "content": {"type": "String"}
+    }
+  },
+  "notification_boostByMany": "{username} and {count} others boosted your post",
+  "@notification_boostByMany": {
+    "placeholders": {
+      "username": {"type": "String"},
+      "count": {"type": "int"}
+    }
+  },
   "notification_bookmarkReminder": "Bookmark reminder",
   "notification_channelBackground": "Background",
   "notification_channelBackgroundDesc": "Keep FluxDO receiving notifications in background",
@@ -55,6 +75,7 @@
   "notification_topicReminder": "Topic reminder",
   "notification_typeAdminProblems": "Admin problems",
   "notification_typeAssignedTopic": "Topic assigned",
+  "notification_typeBoost": "Boost",
   "notification_typeBookmarkReminder": "Bookmark reminder",
   "notification_typeChatGroupMention": "Group chat mention",
   "notification_typeChatInvitation": "Chat invitation",

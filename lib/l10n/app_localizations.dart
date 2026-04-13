@@ -5740,6 +5740,24 @@ abstract class AppLocalizations {
   /// **'正在后台运行，保持通知接收'**
   String get notification_backgroundRunning;
 
+  /// No description provided for @notification_boost.
+  ///
+  /// In zh, this message translates to:
+  /// **'{username} Boost 了你的帖子'**
+  String notification_boost(String username);
+
+  /// No description provided for @notification_boostWithContent.
+  ///
+  /// In zh, this message translates to:
+  /// **'{username}: {content}'**
+  String notification_boostWithContent(String username, String content);
+
+  /// No description provided for @notification_boostByMany.
+  ///
+  /// In zh, this message translates to:
+  /// **'{username} 等 {count} 人 Boost 了你的帖子'**
+  String notification_boostByMany(String username, int count);
+
   /// No description provided for @notification_bookmarkReminder.
   ///
   /// In zh, this message translates to:
@@ -6051,6 +6069,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'话题指派'**
   String get notification_typeAssignedTopic;
+
+  /// No description provided for @notification_typeBoost.
+  ///
+  /// In zh, this message translates to:
+  /// **'Boost'**
+  String get notification_typeBoost;
 
   /// No description provided for @notification_typeBookmarkReminder.
   ///
@@ -9683,6 +9707,36 @@ abstract class AppLocalizations {
   /// **'关注'**
   String get followList_following;
 
+  /// No description provided for @privateMessages_title.
+  ///
+  /// In zh, this message translates to:
+  /// **'私信'**
+  String get privateMessages_title;
+
+  /// No description provided for @privateMessages_inbox.
+  ///
+  /// In zh, this message translates to:
+  /// **'最新'**
+  String get privateMessages_inbox;
+
+  /// No description provided for @privateMessages_sent.
+  ///
+  /// In zh, this message translates to:
+  /// **'已发送'**
+  String get privateMessages_sent;
+
+  /// No description provided for @privateMessages_archive.
+  ///
+  /// In zh, this message translates to:
+  /// **'归档'**
+  String get privateMessages_archive;
+
+  /// No description provided for @privateMessages_empty.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂无私信'**
+  String get privateMessages_empty;
+
   /// No description provided for @profileStats_addItems.
   ///
   /// In zh, this message translates to:
@@ -10012,6 +10066,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'元宇宙'**
   String get profile_metaverse;
+
+  /// No description provided for @profile_privateMessages.
+  ///
+  /// In zh, this message translates to:
+  /// **'私信'**
+  String get profile_privateMessages;
 
   /// No description provided for @profile_myBadges.
   ///

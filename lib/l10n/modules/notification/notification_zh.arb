@@ -3,6 +3,36 @@
   "notification_adminNewSuggestions": "网站信息中心有新建议",
   "notification_assignedTopic": "话题已分配给你",
   "notification_backgroundRunning": "正在后台运行，保持通知接收",
+  "notification_boost": "{username} Boost 了你的帖子",
+  "@notification_boost": {
+    "placeholders": {
+      "username": {
+        "type": "String"
+      }
+    }
+  },
+  "notification_boostWithContent": "{username}: {content}",
+  "@notification_boostWithContent": {
+    "placeholders": {
+      "username": {
+        "type": "String"
+      },
+      "content": {
+        "type": "String"
+      }
+    }
+  },
+  "notification_boostByMany": "{username} 等 {count} 人 Boost 了你的帖子",
+  "@notification_boostByMany": {
+    "placeholders": {
+      "username": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "notification_bookmarkReminder": "书签提醒",
   "notification_channelBackground": "后台运行",
   "notification_channelBackgroundDesc": "保持 FluxDO 在后台接收通知",
@@ -297,6 +327,7 @@
   "notification_topicReminder": "话题提醒",
   "notification_typeAdminProblems": "管理员问题",
   "notification_typeAssignedTopic": "话题指派",
+  "notification_typeBoost": "Boost",
   "notification_typeBookmarkReminder": "书签提醒",
   "notification_typeChatGroupMention": "群聊提及",
   "notification_typeChatInvitation": "聊天邀请",
