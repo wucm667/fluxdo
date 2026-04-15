@@ -685,6 +685,8 @@ class _MainPageState extends ConsumerState<MainPage>
         BackgroundNotificationService().disable();
         MessageBusService().exitBackgroundMode();
         ref.invalidate(notificationListProvider);
+        // 检查 DOH 代理是否在后台期间失效，若失效则自动重启
+        NetworkSettingsService.instance.ensureProxyAlive();
         // 回到前台时主动检查连通性（等同 Discourse 的 visibilitychange）
         ConnectivityService().check();
         // 恢复 cf_clearance 自动续期监控
