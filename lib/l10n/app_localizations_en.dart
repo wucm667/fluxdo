@@ -4562,6 +4562,38 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hcaptcha_webviewTitle => 'hCaptcha Accessibility';
 
   @override
+  String get bottomNav_actionPickerTitle => 'Choose action';
+
+  @override
+  String get bottomNav_doubleTapAction => 'Double tap on active tab';
+
+  @override
+  String get bottomNav_doubleTapActionDesc =>
+      'Action triggered on the second tap within 300ms';
+
+  @override
+  String get bottomNav_gesturesGroup => 'Gestures';
+
+  @override
+  String get bottomNav_singleTapAction => 'Single tap on active tab';
+
+  @override
+  String get bottomNav_singleTapActionDesc =>
+      'Action triggered when tapping an already-selected tab';
+
+  @override
+  String get bottomNav_title => 'Bottom Navigation';
+
+  @override
+  String get navTapAction_none => 'None';
+
+  @override
+  String get navTapAction_refresh => 'Refresh';
+
+  @override
+  String get navTapAction_scrollToTop => 'Scroll to top';
+
+  @override
   String get config_seedUserTitle => 'Seed user';
 
   @override
@@ -4664,6 +4696,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settings_appearance => 'Appearance';
+
+  @override
+  String get settings_bottomNav => 'Bottom Navigation';
 
   @override
   String get settings_dataManagement => 'Data Management';

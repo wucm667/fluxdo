@@ -4450,6 +4450,36 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hcaptcha_webviewTitle => 'hCaptcha 无障碍';
 
   @override
+  String get bottomNav_actionPickerTitle => '选择动作';
+
+  @override
+  String get bottomNav_doubleTapAction => '双击已选中项';
+
+  @override
+  String get bottomNav_doubleTapActionDesc => '300ms 内第二次点击时执行的动作';
+
+  @override
+  String get bottomNav_gesturesGroup => '手势';
+
+  @override
+  String get bottomNav_singleTapAction => '单击已选中项';
+
+  @override
+  String get bottomNav_singleTapActionDesc => '再次点击已选中的标签时执行的动作';
+
+  @override
+  String get bottomNav_title => '底栏';
+
+  @override
+  String get navTapAction_none => '无';
+
+  @override
+  String get navTapAction_refresh => '刷新';
+
+  @override
+  String get navTapAction_scrollToTop => '回到顶部';
+
+  @override
   String get config_seedUserTitle => '种子用户';
 
   @override
@@ -4543,6 +4573,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settings_appearance => '外观设置';
+
+  @override
+  String get settings_bottomNav => '底栏设置';
 
   @override
   String get settings_dataManagement => '数据管理';
@@ -10264,6 +10297,36 @@ class AppLocalizationsZhHk extends AppLocalizationsZh {
   String get hcaptcha_webviewTitle => 'hCaptcha 無障礙';
 
   @override
+  String get bottomNav_actionPickerTitle => '選擇動作';
+
+  @override
+  String get bottomNav_doubleTapAction => '雙擊已選中項';
+
+  @override
+  String get bottomNav_doubleTapActionDesc => '300ms 內第二次點擊時執行的動作';
+
+  @override
+  String get bottomNav_gesturesGroup => '手勢';
+
+  @override
+  String get bottomNav_singleTapAction => '單擊已選中項';
+
+  @override
+  String get bottomNav_singleTapActionDesc => '再次點擊已選中的標籤時執行的動作';
+
+  @override
+  String get bottomNav_title => '底欄';
+
+  @override
+  String get navTapAction_none => '無';
+
+  @override
+  String get navTapAction_refresh => '重新載入';
+
+  @override
+  String get navTapAction_scrollToTop => '回到頂部';
+
+  @override
   String get config_seedUserTitle => '種子用户';
 
   @override
@@ -10357,6 +10420,9 @@ class AppLocalizationsZhHk extends AppLocalizationsZh {
 
   @override
   String get settings_appearance => '外觀設定';
+
+  @override
+  String get settings_bottomNav => '底欄設定';
 
   @override
   String get settings_dataManagement => '資料管理';
@@ -15954,6 +16020,36 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get hcaptcha_webviewTitle => 'hCaptcha 無障礙';
 
   @override
+  String get bottomNav_actionPickerTitle => '選擇動作';
+
+  @override
+  String get bottomNav_doubleTapAction => '雙擊已選取項目';
+
+  @override
+  String get bottomNav_doubleTapActionDesc => '300ms 內第二次點擊時執行的動作';
+
+  @override
+  String get bottomNav_gesturesGroup => '手勢';
+
+  @override
+  String get bottomNav_singleTapAction => '單擊已選取項目';
+
+  @override
+  String get bottomNav_singleTapActionDesc => '再次點擊已選取的標籤時執行的動作';
+
+  @override
+  String get bottomNav_title => '底欄';
+
+  @override
+  String get navTapAction_none => '無';
+
+  @override
+  String get navTapAction_refresh => '重新整理';
+
+  @override
+  String get navTapAction_scrollToTop => '回到頂端';
+
+  @override
   String get config_seedUserTitle => '種子使用者';
 
   @override
@@ -16047,6 +16143,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settings_appearance => '外觀設定';
+
+  @override
+  String get settings_bottomNav => '底欄設定';
 
   @override
   String get settings_dataManagement => '資料管理';

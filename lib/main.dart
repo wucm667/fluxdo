@@ -78,6 +78,7 @@ import 'widgets/layout/adaptive_scaffold.dart';
 import 'widgets/layout/adaptive_navigation.dart';
 import 'widgets/notification/notification_quick_panel.dart';
 import 'widgets/read_later/read_later_bubble.dart';
+import 'navigation/nav_action_bus.dart';
 import 'providers/read_later_provider.dart';
 import 'providers/shortcut_provider.dart';
 import 'widgets/keyboard_shortcut_handler.dart';
@@ -499,6 +500,7 @@ class _MainPageState extends ConsumerState<MainPage>
   bool _messageBusInitialized = false;
   int? _lastTappedIndex;
   DateTime? _lastTapTime;
+  Timer? _pendingSingleTap;
   Timer? _resumeDebounceTimer;
   DateTime? _lastBackPressTime;
 
@@ -631,27 +633,86 @@ class _MainPageState extends ConsumerState<MainPage>
 
   void _onDestinationSelected(int index) {
     final now = DateTime.now();
-    final isDoubleTap =
+
+    // 切换 tab：只记录时间戳，不走手势分流
+    if (index != _currentIndex) {
+      _cancelPendingSingleTap();
+      _lastTappedIndex = index;
+      _lastTapTime = now;
+      ref.read(barVisibilityProvider.notifier).state = 1.0;
+      setState(() => _currentIndex = index);
+      return;
+    }
+
+    // 点击已选中 tab（主要走侧栏路径；底栏在 AdaptiveBottomNavigation 内已自行分流）
+    final prefs = ref.read(preferencesProvider);
+    final single = prefs.bottomSingleTapAction;
+    final doubleAction = prefs.bottomDoubleTapAction;
+
+    final hasSingle = single != NavTapAction.none;
+    final hasDouble = doubleAction != NavTapAction.none;
+    if (!hasSingle && !hasDouble) return;
+
+    final id = _navIdForIndex(index);
+    if (id.isEmpty) return;
+
+    final isDoubleTap = hasDouble &&
         _lastTappedIndex == index &&
         _lastTapTime != null &&
         now.difference(_lastTapTime!).inMilliseconds < 300;
 
-    if (isDoubleTap && index == _currentIndex) {
-      // 双击当前 tab，滚动到顶部
-      if (index == 0) {
-        ref.read(scrollToTopProvider.notifier).trigger();
+    if (isDoubleTap) {
+      // 互斥：取消 pending 单击，只触发双击
+      _cancelPendingSingleTap();
+      final navAction = doubleAction.toNavAction();
+      if (navAction != null) {
+        ref.dispatchNavAction(id, navAction);
       }
       _lastTappedIndex = null;
       _lastTapTime = null;
-    } else {
-      _lastTappedIndex = index;
-      _lastTapTime = now;
-      if (index != _currentIndex) {
-        // 切换 tab 时重置底栏可见性
-        ref.read(barVisibilityProvider.notifier).state = 1.0;
-        setState(() => _currentIndex = index);
-      }
+      return;
     }
+
+    // 第一次点击
+    _lastTappedIndex = index;
+    _lastTapTime = now;
+
+    if (!hasSingle) return;
+
+    final navAction = single.toNavAction();
+    if (navAction == null) return;
+
+    if (hasDouble) {
+      // 两者都有：延迟 300ms 触发单击，等待可能的第二次点击
+      _cancelPendingSingleTap();
+      _pendingSingleTap = Timer(const Duration(milliseconds: 300), () {
+        _pendingSingleTap = null;
+        if (!mounted) return;
+        ref.dispatchNavAction(id, navAction);
+        if (_lastTappedIndex == index) {
+          _lastTappedIndex = null;
+          _lastTapTime = null;
+        }
+      });
+    } else {
+      // 双击为 none：单击立即触发，零延迟
+      ref.dispatchNavAction(id, navAction);
+    }
+  }
+
+  void _cancelPendingSingleTap() {
+    _pendingSingleTap?.cancel();
+    _pendingSingleTap = null;
+  }
+
+  String _navIdForIndex(int index) {
+    switch (index) {
+      case 0:
+        return NavEntryIds.home;
+      case 1:
+        return NavEntryIds.profile;
+    }
+    return '';
   }
 
   @override
@@ -661,6 +722,7 @@ class _MainPageState extends ConsumerState<MainPage>
     }
     WidgetsBinding.instance.removeObserver(this);
     _resumeDebounceTimer?.cancel();
+    _pendingSingleTap?.cancel();
     _authErrorSub?.close();
     _authStateSub?.close();
     _currentUserSub?.close();
@@ -854,11 +916,13 @@ class _MainPageState extends ConsumerState<MainPage>
 
     return [
       AdaptiveDestination(
+        id: NavEntryIds.home,
         icon: const Icon(Icons.home_outlined),
         selectedIcon: const Icon(Icons.home),
         label: S.current.nav_home,
       ),
       AdaptiveDestination(
+        id: NavEntryIds.profile,
         icon: avatarWidget ?? const Icon(Icons.person_outline),
         selectedIcon: avatarWidget ?? const Icon(Icons.person),
         label: S.current.nav_mine,

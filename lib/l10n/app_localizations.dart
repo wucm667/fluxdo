@@ -8326,6 +8326,66 @@ abstract class AppLocalizations {
   /// **'hCaptcha 无障碍'**
   String get hcaptcha_webviewTitle;
 
+  /// No description provided for @bottomNav_actionPickerTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择动作'**
+  String get bottomNav_actionPickerTitle;
+
+  /// No description provided for @bottomNav_doubleTapAction.
+  ///
+  /// In zh, this message translates to:
+  /// **'双击已选中项'**
+  String get bottomNav_doubleTapAction;
+
+  /// No description provided for @bottomNav_doubleTapActionDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'300ms 内第二次点击时执行的动作'**
+  String get bottomNav_doubleTapActionDesc;
+
+  /// No description provided for @bottomNav_gesturesGroup.
+  ///
+  /// In zh, this message translates to:
+  /// **'手势'**
+  String get bottomNav_gesturesGroup;
+
+  /// No description provided for @bottomNav_singleTapAction.
+  ///
+  /// In zh, this message translates to:
+  /// **'单击已选中项'**
+  String get bottomNav_singleTapAction;
+
+  /// No description provided for @bottomNav_singleTapActionDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'再次点击已选中的标签时执行的动作'**
+  String get bottomNav_singleTapActionDesc;
+
+  /// No description provided for @bottomNav_title.
+  ///
+  /// In zh, this message translates to:
+  /// **'底栏'**
+  String get bottomNav_title;
+
+  /// No description provided for @navTapAction_none.
+  ///
+  /// In zh, this message translates to:
+  /// **'无'**
+  String get navTapAction_none;
+
+  /// No description provided for @navTapAction_refresh.
+  ///
+  /// In zh, this message translates to:
+  /// **'刷新'**
+  String get navTapAction_refresh;
+
+  /// No description provided for @navTapAction_scrollToTop.
+  ///
+  /// In zh, this message translates to:
+  /// **'回到顶部'**
+  String get navTapAction_scrollToTop;
+
   /// No description provided for @config_seedUserTitle.
   ///
   /// In zh, this message translates to:
@@ -8511,6 +8571,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'外观设置'**
   String get settings_appearance;
+
+  /// No description provided for @settings_bottomNav.
+  ///
+  /// In zh, this message translates to:
+  /// **'底栏设置'**
+  String get settings_bottomNav;
 
   /// No description provided for @settings_dataManagement.
   ///
