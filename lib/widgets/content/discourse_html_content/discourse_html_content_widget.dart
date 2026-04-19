@@ -31,7 +31,9 @@ import 'builders/image_grid_builder.dart';
 import 'builders/combined_decorator_overlay.dart';
 import 'builders/local_date_builder.dart';
 import 'builders/mention_builder.dart';
+import 'builders/policy_builder.dart';
 import 'builders/scan_boundary.dart';
+import 'current_post_scope.dart';
 import 'image_utils.dart';
 
 /// Discourse HTML 内容渲染 Widget
@@ -563,6 +565,13 @@ class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
       result = htmlWidget;
     }
 
+    // 把当前 Post 通过 InheritedWidget 广播给 HTML 子树的自定义组件
+    // （如 PolicyWidget），让它们能响应外层 Post 引用变化——绕开
+    // HtmlWidget 在 cooked 未变时复用子树导致 widget.post 冻住的问题。
+    if (widget.post != null) {
+      result = CurrentPostScope(post: widget.post!, child: result);
+    }
+
     // 根据参数决定是否包裹 SelectionArea
     if (widget.enableSelectionArea) {
       return SelectionArea(
@@ -698,6 +707,20 @@ class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
           theme: theme,
           element: element,
           post: widget.post!,
+        );
+      }
+      return const SizedBox.shrink();
+    }
+
+    // 处理 Policy 块 (div.policy)
+    if (element.localName == 'div' && element.classes.contains('policy')) {
+      if (widget.post != null) {
+        return buildPolicy(
+          context: context,
+          theme: theme,
+          element: element,
+          post: widget.post!,
+          htmlBuilder: htmlBuilder,
         );
       }
       return const SizedBox.shrink();
