@@ -61,6 +61,7 @@ import 'models/user.dart';
 import 'constants.dart';
 import 'providers/connectivity_provider.dart';
 import 'utils/dialog_utils.dart';
+import 'utils/time_utils.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ai_model_manager/ai_model_manager.dart';
@@ -117,6 +118,7 @@ Future<void> main() async {
     CookieJarService().initialize(),
     CsrfTokenService().init(),
     BackgroundNotificationService().initialize(),
+    TimeUtils.initialize(),
   ];
   // 桌面平台初始化 window_manager 和 flutter_acrylic
   if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {

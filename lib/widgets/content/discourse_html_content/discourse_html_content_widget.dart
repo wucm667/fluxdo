@@ -29,6 +29,7 @@ import 'builders/iframe_builder.dart';
 import 'builders/lazy_video_builder.dart';
 import 'builders/image_grid_builder.dart';
 import 'builders/combined_decorator_overlay.dart';
+import 'builders/local_date_builder.dart';
 import 'builders/mention_builder.dart';
 import 'builders/scan_boundary.dart';
 import 'image_utils.dart';
@@ -635,6 +636,18 @@ class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
         element: element,
         baseFontSize: widget.textStyle?.fontSize ?? 14.0,
       );
+    }
+
+    // Discourse 本地日期 (span.discourse-local-date)：转为设备本地时区渲染
+    if (element.localName == 'span' &&
+        element.classes.contains('discourse-local-date')) {
+      final localDate = buildLocalDate(
+        context: context,
+        theme: theme,
+        element: element,
+        baseFontSize: widget.textStyle?.fontSize ?? 14.0,
+      );
+      if (localDate != null) return localDate;
     }
 
     // 链接点击数 (span.click-count)：直接 WidgetSpan 渲染
